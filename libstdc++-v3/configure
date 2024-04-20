@@ -4899,7 +4899,7 @@ _ACEOF
 
       ac_exception_model_name=sjlj
       ;;
-    no)
+    *)
       ac_exception_model_name="call frame"
       ;;
     *)

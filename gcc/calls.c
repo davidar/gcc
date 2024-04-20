@@ -685,6 +685,13 @@ setjmp_call_p (tree fndecl)
   return special_function_p (fndecl, 0) & ECF_RETURNS_TWICE;
 }
 
+int
+longjmp_call_p (fndecl)
+     tree fndecl;
+{
+  return special_function_p (fndecl, 0) & ECF_LONGJMP;
+}
+
 /* Return true when exp contains alloca call.  */
 bool
 alloca_call_p (tree exp)

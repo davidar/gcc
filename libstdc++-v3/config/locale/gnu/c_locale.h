@@ -45,6 +45,8 @@
 #include <langinfo.h>		// For codecvt
 #include <iconv.h>		// For codecvt using iconv, iconv_t
 #include <libintl.h> 		// For messages
+#include <cstdlib>
+#include <cstring>
 
 #define _GLIBCXX_C_LOCALE_GNU 1
 

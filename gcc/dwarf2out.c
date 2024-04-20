@@ -9630,7 +9630,7 @@ add_bound_info (dw_die_ref subrange_die, enum dwarf_attribute bound_attr, tree b
 	   make a SAVE_EXPR, so do it ourselves.  */
 	if (ctx == 0)
 	  bound = build (SAVE_EXPR, TREE_TYPE (bound), bound,
-			 current_function_decl, NULL_TREE);
+			 current_function_decl, NULL_TREE, 0);
 
 	decl_die = new_die (DW_TAG_variable, ctx, bound);
 	add_AT_flag (decl_die, DW_AT_artificial, 1);

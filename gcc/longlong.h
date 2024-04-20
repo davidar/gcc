@@ -95,6 +95,8 @@
    for the CPUs below!
    (E.g. WE32100, IBM360.)  */
 
+#define NO_ASM
+
 #if defined (__GNUC__) && !defined (NO_ASM)
 
 /* We sometimes need to clobber "cc" with gcc2, but that would not be

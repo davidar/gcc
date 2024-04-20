@@ -25,5 +25,5 @@ SHLIB_INSTALL = \
 	rm -f $$(DESTDIR)$$(slibdir)$(SHLIB_SLIBDIR_QUAL)/$(SHLIB_SOLINK); \
 	$(LN_S) $(SHLIB_SONAME) \
 	  $$(DESTDIR)$$(slibdir)$(SHLIB_SLIBDIR_QUAL)/$(SHLIB_SOLINK)
-SHLIB_MKMAP = $(srcdir)/mkmap-symver.awk
+#SHLIB_MKMAP = $(srcdir)/mkmap-symver.awk
 SHLIB_MAPFILES = $(srcdir)/libgcc-std.ver

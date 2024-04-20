@@ -134,17 +134,9 @@
  * appended to the paths and /usr/ccs/lib is no longer necessary
  */
 #define LINK_ARCH64_SPEC \
-  "%{mcmodel=medlow:-M /usr/lib/ld/sparcv9/map.below4G} \
-   %{G:-G} \
+   "%{G:--link-as-library} \
    %{YP,*} \
-   %{R*} \
-   %{compat-bsd: \
-     %{!YP,*:%{p|pg:-Y P,/usr/ucblib/sparcv9:/usr/lib/libp/sparcv9:/usr/lib/sparcv9} \
-       %{!p:%{!pg:-Y P,/usr/ucblib/sparcv9:/usr/lib/sparcv9}}} \
-     -R /usr/ucblib} \
-   %{!compat-bsd: \
-     %{!YP,*:%{p|pg:-Y P,/usr/lib/libp/sparcv9:/usr/lib/sparcv9} \
-       %{!p:%{!pg:-Y P,/usr/lib/sparcv9}}}}"
+   %{R*}"
 
 #undef LINK_ARCH_SPEC
 #define LINK_ARCH_SPEC "\
