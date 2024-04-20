@@ -41,6 +41,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tsystem.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "llvm-out.h"
 
 /* Don't use `fancy_abort' here even if config.h says to use it.  */
 #ifdef abort
@@ -1603,8 +1604,10 @@ mprotect (char *addr, int len, int prot)
 
 #endif /* WINNT && ! __CYGWIN__ && ! _UWIN */
 
+#if !EMIT_LLVM
 #ifdef TRANSFER_FROM_TRAMPOLINE
 TRANSFER_FROM_TRAMPOLINE
+#endif
 #endif
 #endif /* L_trampoline */
 

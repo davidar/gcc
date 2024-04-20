@@ -47,6 +47,11 @@ static inline _Atomic_word
 __attribute__ ((__unused__))
 __exchange_and_add (volatile _Atomic_word *__mem, int __val)
 {
+#ifdef __llvm__
+  register _Atomic_word __result;
+  __result = *__mem;
+  *__mem += __val;
+#else
   register _Atomic_word __result, __tmp = 1;
 
   /* obtain the atomic exchange/add spin lock */
@@ -61,6 +66,7 @@ __exchange_and_add (volatile _Atomic_word *__mem, int __val)
 
   /* release spin lock */
   __Atomicity_lock<0>::_S_atomicity_lock = 0;
+#endif
 
   return __result;
 }

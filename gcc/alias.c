@@ -42,6 +42,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "timevar.h"
 #include "target.h"
 #include "cgraph.h"
+#include "llvm-out.h"
 
 /* The alias sets assigned to MEMs assist the back-end in determining
    which MEMs can alias which other MEMs.  In general, two MEMs in
@@ -447,6 +448,8 @@ HOST_WIDE_INT
 get_alias_set (tree t)
 {
   HOST_WIDE_INT set;
+
+  LLVM_SHOULD_NOT_CALL();
 
   /* If we're not doing any alias analysis, just assume everything
      aliases everything else.  Also return 0 if this or its type is

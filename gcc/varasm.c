@@ -50,6 +50,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "target.h"
 #include "cgraph.h"
 
+#include "llvm-out.h"
+
 #ifdef XCOFF_DEBUGGING_INFO
 #include "xcoffout.h"		/* Needed for external data
 				   declarations for e.g. AIX 4.x.  */
@@ -750,6 +752,8 @@ make_decl_rtl (tree decl, const char *asmspec)
   int reg_number;
   rtx x;
 
+  LLVM_SHOULD_NOT_CALL();
+
   /* Check that we are not being given an automatic variable.  */
   /* A weak alias has TREE_PUBLIC set but not the other bits.  */
   if (TREE_CODE (decl) == PARM_DECL
@@ -894,6 +898,10 @@ make_decl_rtl (tree decl, const char *asmspec)
 void
 make_var_volatile (tree var)
 {
+  if (EMIT_LLVM) {
+    llvm_mark_variable_volatile(var);
+    return;
+  }
   if (GET_CODE (DECL_RTL (var)) != MEM)
     abort ();
 
@@ -906,6 +914,11 @@ make_var_volatile (tree var)
 void
 assemble_asm (tree string)
 {
+  if (EMIT_LLVM) {
+    error("ERROR: File level ASM not supported in LLVM: \"%s\"\n",
+            TREE_STRING_POINTER (string));
+    return;
+  }
   app_enable ();
 
   if (TREE_CODE (string) == ADDR_EXPR)
@@ -1395,6 +1408,11 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
   if (TREE_ASM_WRITTEN (decl))
     return;
 
+  if (EMIT_LLVM) {
+    llvm_assemble_variable(decl);
+    return;
+  }
+
   /* Make sure targetm.encode_section_info is invoked before we set
      ASM_WRITTEN.  */
   decl_rtl = DECL_RTL (decl);
@@ -1603,16 +1621,22 @@ contains_pointers_p (tree type)
 void
 assemble_external (tree decl ATTRIBUTE_UNUSED)
 {
-  /* Because most platforms do not define ASM_OUTPUT_EXTERNAL, the
-     main body of this code is only rarely exercised.  To provide some
-     testing, on all platforms, we make sure that the ASM_OUT_FILE is
-     open.  If it's not, we should not be calling this function.  */
-  if (!asm_out_file)
-    abort ();
-
-#ifdef ASM_OUTPUT_EXTERNAL
   if (DECL_P (decl) && DECL_EXTERNAL (decl) && TREE_PUBLIC (decl))
     {
+      if (EMIT_LLVM) {
+        if (!DECL_LLVM_SET_P(decl))
+          llvm_assemble_external(decl);
+        return;
+      }
+      
+      /* Because most platforms do not define ASM_OUTPUT_EXTERNAL, the
+         main body of this code is only rarely exercised.  To provide some
+         testing, on all platforms, we make sure that the ASM_OUT_FILE is
+         open.  If it's not, we should not be calling this function.  */
+      if (!asm_out_file)
+        abort ();
+
+#ifdef ASM_OUTPUT_EXTERNAL
       rtx rtl = DECL_RTL (decl);
 
       if (GET_CODE (rtl) == MEM && GET_CODE (XEXP (rtl, 0)) == SYMBOL_REF
@@ -1622,8 +1646,8 @@ assemble_external (tree decl ATTRIBUTE_UNUSED)
 	  SYMBOL_REF_USED (XEXP (rtl, 0)) = 1;
 	  ASM_OUTPUT_EXTERNAL (asm_out_file, decl, XSTR (XEXP (rtl, 0), 0));
 	}
-    }
 #endif
+    }
 }
 
 /* Similar, for calling a library function FUN.  */
@@ -4263,6 +4287,16 @@ void
 weak_finish (void)
 {
   tree t;
+
+  if (EMIT_LLVM) {
+    /* For LLVM, we don't have to do anything here.  The only time this code
+     * path is called is when there is an external function which has "#pragma
+     * weak" or the weak attribute added to it, after the function prototype is
+     * first found.  Since we cannot (and don't have to) mark an external
+     * function as weak, we have nothing to do here.
+     */
+    return;
+  }
 
   for (t = weak_decls; t; t = TREE_CHAIN (t))
     {

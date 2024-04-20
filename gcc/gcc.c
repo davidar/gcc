@@ -83,6 +83,7 @@ compilation is specified by a string called a "spec".  */
 #include "prefix.h"
 #include "gcc.h"
 #include "flags.h"
+#include "llvm-out.h"
 
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -555,8 +556,13 @@ proper position among the other output files.  */
 
 /* config.h can define ASM_SPEC to provide extra args to the assembler
    or extra switch-translations.  */
+#if EMIT_LLVM
+#undef ASM_SPEC
+#define ASM_SPEC ""
+#else
 #ifndef ASM_SPEC
 #define ASM_SPEC ""
+#endif
 #endif
 
 /* config.h can define ASM_FINAL_SPEC to run a post processor after
@@ -585,8 +591,17 @@ proper position among the other output files.  */
 
 /* config.h can define LINK_SPEC to provide extra args to the linker
    or extra switch-translations.  */
+#if EMIT_LLVM
+#undef LINK_SPEC
+#define LINK_SPEC "%{shared: --link-as-library}"
+#undef LINK_EH_SPEC
+#define LINK_EH_SPEC ""
+#undef ASM_DEBUG_SPEC
+#define ASM_DEBUG_SPEC ""
+#else
 #ifndef LINK_SPEC
 #define LINK_SPEC ""
+#endif
 #endif
 
 /* config.h can define LIB_SPEC to override the default libraries.  */
@@ -606,9 +621,14 @@ proper position among the other output files.  */
 #endif
 
 /* config.h can define STARTFILE_SPEC to override the default crt0 files.  */
+#if EMIT_LLVM
+#undef STARTFILE_SPEC
+#define STARTFILE_SPEC ""
+#else
 #ifndef STARTFILE_SPEC
 #define STARTFILE_SPEC  \
   "%{!shared:%{pg:gcrt0%O%s}%{!pg:%{p:mcrt0%O%s}%{!p:crt0%O%s}}}"
+#endif
 #endif
 
 /* config.h can define SWITCHES_NEED_SPACES to control which options
@@ -618,12 +638,22 @@ proper position among the other output files.  */
 #endif
 
 /* config.h can define ENDFILE_SPEC to override the default crtn files.  */
+#if EMIT_LLVM
+#undef ENDFILE_SPEC
+#define ENDFILE_SPEC "%{!shared:crtend.o}"
+#else
 #ifndef ENDFILE_SPEC
 #define ENDFILE_SPEC ""
 #endif
+#endif
 
+#if EMIT_LLVM
+#undef LINKER_NAME
+#define LINKER_NAME "gccld"
+#else
 #ifndef LINKER_NAME
 #define LINKER_NAME "collect2"
+#endif
 #endif
 
 /* Define ASM_DEBUG_SPEC to be a spec suitable for translating '-g'
@@ -2371,6 +2401,11 @@ find_a_file (struct path_prefix *pprefix, const char *name, int mode,
   int len = pprefix->max_len + strlen (name) + strlen (file_suffix) + 1;
   const char *multilib_name, *multilib_os_name;
 
+  if (EMIT_LLVM) {
+    if (!strcmp(name, "as")) return xstrdup("gccas");
+    if (!strcmp(name, "ld")) return xstrdup("gccld");
+  }
+
 #ifdef DEFAULT_ASSEMBLER
   if (! strcmp (name, "as") && access (DEFAULT_ASSEMBLER, mode) == 0)
     return xstrdup (DEFAULT_ASSEMBLER);
@@ -2750,7 +2785,7 @@ execute (void)
 				  &errmsg_fmt, &errmsg_arg,
 				  ((i == 0 ? PEXECUTE_FIRST : 0)
 				   | (i + 1 == n_commands ? PEXECUTE_LAST : 0)
-				   | (string == commands[i].prog
+				   | ((string == commands[i].prog || EMIT_LLVM)
 				      ? PEXECUTE_SEARCH : 0)
 				   | (verbose_flag ? PEXECUTE_VERBOSE : 0)));
 

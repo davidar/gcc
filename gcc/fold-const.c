@@ -58,6 +58,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "md5.h"
 
+#include "llvm-out.h"
+
 static void encode (HOST_WIDE_INT *, unsigned HOST_WIDE_INT, HOST_WIDE_INT);
 static void decode (HOST_WIDE_INT *, unsigned HOST_WIDE_INT *, HOST_WIDE_INT *);
 static bool negate_expr_p (tree);
@@ -3714,6 +3716,9 @@ fold_truthop (enum tree_code code, tree truth_type, tree lhs, tree rhs)
   /* See if the comparisons can be merged.  Then get all the parameters for
      each side.  */
 
+  /* LLVM: We do not want to destroy type safety by folding fields together! */
+  if (EMIT_LLVM) return 0;
+
   if ((lcode != EQ_EXPR && lcode != NE_EXPR)
       || (rcode != EQ_EXPR && rcode != NE_EXPR))
     return 0;
@@ -5779,7 +5784,7 @@ fold (tree expr)
 	enum tree_code code0, code1;
 	code0 = TREE_CODE (arg0);
 	code1 = TREE_CODE (arg1);
-	if (((code0 == RSHIFT_EXPR && code1 == LSHIFT_EXPR)
+	if (!EMIT_LLVM && ((code0 == RSHIFT_EXPR && code1 == LSHIFT_EXPR)
 	     || (code1 == RSHIFT_EXPR && code0 == LSHIFT_EXPR))
 	    && operand_equal_p (TREE_OPERAND (arg0, 0),
 			        TREE_OPERAND (arg1, 0), 0)
@@ -5937,6 +5942,14 @@ fold (tree expr)
       /* A - (-B) -> A + B */
       if (TREE_CODE (arg1) == NEGATE_EXPR)
 	return fold (build (PLUS_EXPR, type, arg0, TREE_OPERAND (arg1, 0)));
+if (!EMIT_LLVM) {
+  /* DISABLE THIS TRANSFORMATION, which causes an infinite loop on:
+     double Test(double A, double B, double C, double D) {
+       return -(A-B) - (C-D);
+     }
+     THIS APPEARS TO BE A GCC BUG.
+   */
+
       /* (-A) - B -> (-B) - A  where B is easily negated and we can swap.  */
       if (TREE_CODE (arg0) == NEGATE_EXPR
 	  && (FLOAT_TYPE_P (type)
@@ -5946,7 +5959,7 @@ fold (tree expr)
 	  && (! TREE_SIDE_EFFECTS (arg1) || TREE_CONSTANT (arg0)))
 	return fold (build (MINUS_EXPR, type, negate_expr (arg1),
 			    TREE_OPERAND (arg0, 0)));
-
+}
       if (! FLOAT_TYPE_P (type))
 	{
 	  if (! wins && integer_zerop (arg0))

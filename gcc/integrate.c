@@ -46,6 +46,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "ggc.h"
 #include "target.h"
 #include "langhooks.h"
+#include "llvm-out.h"
 
 /* Similar, but round to the next highest integer that meets the
    alignment.  */
@@ -2970,6 +2971,8 @@ output_inline_function (tree fndecl)
   enum debug_info_type old_write_symbols = write_symbols;
   const struct gcc_debug_hooks *const old_debug_hooks = debug_hooks;
   struct function *f = DECL_SAVED_INSNS (fndecl);
+
+  LLVM_SHOULD_NOT_CALL();
 
   old_cfun = cfun;
   cfun = f;

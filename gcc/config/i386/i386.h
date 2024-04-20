@@ -34,6 +34,8 @@ Boston, MA 02111-1307, USA.  */
    ADDR_BEG, ADDR_END, PRINT_IREG, PRINT_SCALE, PRINT_B_I_S, and many
    that start with ASM_ or end in ASM_OP.  */
 
+#include "llvm-out.h"
+
 /* Define the specific costs for a given cpu */
 
 struct processor_costs {
@@ -721,6 +723,13 @@ extern int x86_prefetch_sse;
 
 /* target machine storage layout */
 
+#if EMIT_LLVM
+  /* LLVM doesn't want X86 style long doubles: force them to be the same as
+     doubles */
+#define LONG_DOUBLE_TYPE_SIZE 64
+#define MAX_LONG_DOUBLE_TYPE_SIZE 64
+#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
+#else
 /* Define for XFmode or TFmode extended real floating point support.
    The XFmode is specified by i386 ABI, while TFmode may be faster
    due to alignment and simplifications in the address calculations.  */
@@ -730,6 +739,7 @@ extern int x86_prefetch_sse;
 #define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 128
 #else
 #define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 96
+#endif
 #endif
 
 /* Set the value of FLT_EVAL_METHOD in float.h.  When using only the
@@ -813,7 +823,11 @@ extern int x86_prefetch_sse;
    Pentium+ prefers DFmode values to be aligned to 64 bit boundary
    and Pentium Pro XFmode values at 128 bit boundaries.  */
 
+#if !EMIT_LLVM
 #define BIGGEST_ALIGNMENT 128
+#else
+#define BIGGEST_ALIGNMENT 32
+#endif
 
 /* Decide whether a variable of mode MODE should be 128 bit aligned.  */
 #define ALIGN_MODE_128(MODE) \
@@ -2878,6 +2892,7 @@ do {									\
   i386_output_dwarf_dtprel (FILE, SIZE, X)
 #endif
 
+#if !EMIT_LLVM
 /* Switch to init or fini section via SECTION_OP, emit a call to FUNC,
    and switch back.  For x86 we do this only to save a few bytes that
    would otherwise be unused in the text section.  */
@@ -2885,6 +2900,8 @@ do {									\
    asm (SECTION_OP "\n\t"				\
 	"call " USER_LABEL_PREFIX #FUNC "\n"		\
 	TEXT_SECTION_ASM_OP);
+#endif
+
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.

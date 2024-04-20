@@ -46,6 +46,8 @@ Boston, MA 02111-1307, USA.  */
 #include "target.h"
 #include "convert.h"
 
+#include "llvm-out.h"
+
 static tree convert_for_assignment (tree, tree, const char *, tree, int);
 static tree cp_pointer_int_sum (enum tree_code, tree, tree);
 static tree rationalize_conditional_expr (enum tree_code, tree);
@@ -2193,6 +2195,13 @@ build_array_ref (tree array, tree idx)
 	error ("array subscript is not an integer");
 	return error_mark_node;
       }
+
+    /* HACK: Do not create explicit pointer arithmetic for pointer subscripts,
+     * instead, generate an array ref, even though the first argument is a
+     * pointer, not an array!
+     */
+    if (EMIT_LLVM)
+      return build (ARRAY_REF, TREE_TYPE(TREE_TYPE(ar)), ar, ind);
 
     return build_indirect_ref (cp_build_binary_op (PLUS_EXPR, ar, ind),
 			       "array indexing");

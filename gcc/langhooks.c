@@ -245,6 +245,37 @@ lhd_expand_expr (tree t ATTRIBUTE_UNUSED, rtx r ATTRIBUTE_UNUSED,
   abort ();
 }
 
+/* This is the default llvm_expand_expr function. */
+
+struct llvm_value *
+lhd_llvm_expand_expr(struct llvm_function *Fn ATTRIBUTE_UNUSED,
+                     tree t ATTRIBUTE_UNUSED,
+                     struct llvm_value *Ty ATTRIBUTE_UNUSED)
+{
+  abort ();
+}
+
+/* This is the default llvm_expand_lvalue_expr function. */
+
+struct llvm_value *
+lhd_llvm_expand_lvalue_expr(struct llvm_function *Fn ATTRIBUTE_UNUSED,
+                            tree t ATTRIBUTE_UNUSED,
+                            unsigned *BitStart ATTRIBUTE_UNUSED,
+                            unsigned *BitSize ATTRIBUTE_UNUSED)
+{
+  abort ();
+}
+
+/* This is the default llvm_expand_stmt function. */
+
+void
+lhd_llvm_expand_stmt(struct llvm_function *Fn ATTRIBUTE_UNUSED,
+                     tree t ATTRIBUTE_UNUSED)
+{
+  abort ();
+}
+
+
 /* This is the default decl_printable_name function.  */
 
 const char *

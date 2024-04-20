@@ -44,6 +44,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "intl.h"
 #include "ggc.h"
 #include "target.h"
+#include "llvm-out.h"
 
 /* Nonzero if we've already printed a "missing braces around initializer"
    message within this initializer.  */
@@ -1526,6 +1527,13 @@ build_array_ref (tree array, tree index)
 	return error_mark_node;
       }
 
+    /* HACK: Do not create explicit pointer arithmetic for pointer subscripts,
+     * instead, generate an array ref, even though the first argument is a
+     * pointer, not an array!
+     */
+    if (EMIT_LLVM)
+      return build (ARRAY_REF, TREE_TYPE(TREE_TYPE(ar)), ar, ind);
+
     return build_indirect_ref (build_binary_op (PLUS_EXPR, ar, ind, 0),
 			       "array indexing");
   }
@@ -2428,6 +2436,14 @@ build_unary_op (enum tree_code code, tree xarg, int flag)
 	    addr = fold (build (PLUS_EXPR, argtype,
 				convert (argtype, addr),
 				convert (argtype, byte_position (field))));
+            if (EMIT_LLVM) {
+              /* For LLVM, don't fold pointer arithmetic unless doing so
+               * produces a constant!
+               */
+              tree addr2 = build1 (code, argtype, arg);
+              if (!TREE_CONSTANT(addr) || TREE_CONSTANT(addr2))
+                addr = addr2;
+            }
 	  }
 	else
 	  addr = build1 (code, argtype, arg);
@@ -3047,7 +3063,7 @@ build_c_cast (tree type, tree expr)
 	     if the cast breaks type based aliasing.  */
 	  if (!COMPLETE_TYPE_P (TREE_TYPE (type)))
 	    warning ("type-punning to incomplete type might break strict-aliasing rules");
-	  else if (!alias_sets_conflict_p
+	  else if (!EMIT_LLVM && !alias_sets_conflict_p
 		   (get_alias_set (TREE_TYPE (TREE_OPERAND (expr, 0))),
 		    get_alias_set (TREE_TYPE (type))))
 	    warning ("dereferencing type-punned pointer will break strict-aliasing rules");

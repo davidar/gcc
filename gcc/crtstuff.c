@@ -63,6 +63,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "coretypes.h"
 #include "tm.h"
 #include "unwind-dw2-fde.h"
+#include "llvm-out.h"
 
 #ifndef FORCE_CODE_SECTION_ALIGN
 # define FORCE_CODE_SECTION_ALIGN
@@ -147,6 +148,7 @@ typedef void (*func_ptr) (void);
 
 #endif /* OBJECT_FORMAT_ELF */
 
+#if !EMIT_LLVM
 #ifdef CRT_BEGIN
 
 /* NOTE:  In order to be able to support SVR4 shared libraries, we arrange
@@ -191,6 +193,7 @@ STATIC func_ptr __DTOR_LIST__[1]
   __attribute__((section(".dtors"), aligned(sizeof(func_ptr))))
   = { (func_ptr) (-1) };
 #endif /* __DTOR_LIST__ alternatives */
+
 
 #ifdef USE_EH_FRAME_REGISTRY
 /* Stick a label at the beginning of the frame unwind info so we can register
@@ -529,3 +532,4 @@ __do_global_ctors (void)
 #else /* ! CRT_BEGIN && ! CRT_END */
 #error "One of CRT_BEGIN or CRT_END must be defined."
 #endif
+#endif /* !EMIT_LLVM */

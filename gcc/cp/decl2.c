@@ -48,6 +48,10 @@ Boston, MA 02111-1307, USA.  */
 #include "c-common.h"
 #include "cgraph.h"
 #include "tree-inline.h"
+
+#include "llvm-out.h"
+
+
 extern cpp_reader *parse_in;
 
 /* This structure contains information about the initializations
@@ -1978,7 +1982,7 @@ start_objects (int method_type, int initp)
 
   /* It can be a static function as long as collect2 does not have
      to scan the object file to find its ctor/dtor routine.  */
-  TREE_PUBLIC (current_function_decl) = ! targetm.have_ctors_dtors;
+  TREE_PUBLIC (current_function_decl) =!(targetm.have_ctors_dtors || EMIT_LLVM);
 
   /* Mark this declaration as used to avoid spurious warnings.  */
   TREE_USED (current_function_decl) = 1;
@@ -2020,6 +2024,12 @@ finish_objects (int method_type, int initp, tree body)
      no assembly file in which to put the code.  */
   if (flag_syntax_only)
     return;
+
+  if (EMIT_LLVM)
+    {
+      llvm_emit_global_ctor_dtor(method_type == 'I', fn, initp);
+      return;
+    }
 
   if (targetm.have_ctors_dtors)
     {

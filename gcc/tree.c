@@ -354,6 +354,15 @@ copy_node (tree node)
   TREE_CHAIN (t) = 0;
   TREE_ASM_WRITTEN (t) = 0;
 
+  if (TREE_CODE_CLASS(code) == 'd') {
+    SET_DECL_LLVM(t, 0);  /* Do NOT copy over the LLVM decl for this node! */
+  }
+
+  if (code == SAVE_EXPR) {
+    /* Do NOT copy over the previously computed value for this! */
+    SAVE_EXPR_LLVM(t) = 0;
+  }
+
   if (TREE_CODE_CLASS (code) == 'd')
     DECL_UID (t) = next_decl_uid++;
   else if (TREE_CODE_CLASS (code) == 't')
@@ -1371,7 +1380,8 @@ save_expr (tree expr)
   if (contains_placeholder_p (inner))
     return t;
 
-  t = build (SAVE_EXPR, TREE_TYPE (expr), t, current_function_decl, NULL_TREE);
+  t = build (SAVE_EXPR, TREE_TYPE (expr), t, current_function_decl, NULL_TREE,
+             0);
 
   /* This expression might be placed ahead of a jump to ensure that the
      value was computed on both sides of the jump.  So make sure it isn't

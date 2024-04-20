@@ -61,6 +61,12 @@ enum c_language_kind c_language = clk_c;
 #define LANG_HOOKS_SAFE_FROM_P c_safe_from_p
 #undef LANG_HOOKS_EXPAND_EXPR
 #define LANG_HOOKS_EXPAND_EXPR c_expand_expr
+
+#undef LANG_HOOKS_LLVM_EXPAND_EXPR
+#define LANG_HOOKS_LLVM_EXPAND_EXPR c_llvm_expand_expr
+#undef LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR
+#define LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR c_llvm_expand_lvalue_expr
+
 #undef LANG_HOOKS_MARK_ADDRESSABLE
 #define LANG_HOOKS_MARK_ADDRESSABLE c_mark_addressable
 #undef LANG_HOOKS_PARSE_FILE

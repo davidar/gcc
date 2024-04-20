@@ -57,6 +57,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "predict.h"
 #include "optabs.h"
+#include "llvm-out.h"
 
 /* Assume that case vectors are not pc-relative.  */
 #ifndef CASE_VECTOR_PC_RELATIVE
@@ -601,6 +602,7 @@ void
 declare_nonlocal_label (tree label)
 {
   rtx slot = assign_stack_local (Pmode, GET_MODE_SIZE (Pmode), 0);
+  LLVM_SHOULD_NOT_CALL();
 
   nonlocal_labels = tree_cons (NULL_TREE, label, nonlocal_labels);
   LABEL_PRESERVE_P (label_rtx (label)) = 1;

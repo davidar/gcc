@@ -21,6 +21,23 @@ FIXINC_DEBUG = yes;
 #endif
 
 /*
+ * This fixes files to not use inline assembly on LLVM/Linux systems.
+ */
+fix = {
+  hackname  = llvm_inline_asm_linux;
+  files     = "bits/select.h";
+  files     = "bits/byteswap.h";
+  mach      = 'i[34567]86-*-linux*';
+  select    = "^#if defined __GNUC__ && __GNUC__ >= 2";
+
+  c_fix     = format;
+  c_fix_arg = "%0 && !defined __NO_MATH_INLINES";
+  c_fix_arg = "^#if defined __GNUC__ && __GNUC__ >= 2$";
+
+  test_text = "#if defined __GNUC__ && __GNUC__ >= 2";
+};
+
+/*
  *  This fixes __FD_ZERO bug for linux 2.x.y (x <= 2 && y <= some n)
  */
 fix = {

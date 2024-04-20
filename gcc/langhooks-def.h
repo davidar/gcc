@@ -25,6 +25,9 @@ Boston, MA 02111-1307, USA.  */
 #include "hooks.h"
 
 struct diagnostic_context;
+struct llvm_value;
+struct llvm_function;
+struct llvm_type;
 
 /* Provide a hook routine for alias sets that always returns 1.  This is
    used by languages that haven't deal with alias sets yet.  */
@@ -54,6 +57,12 @@ extern void lhd_clear_binding_stack (void);
 extern void lhd_print_tree_nothing (FILE *, tree, int);
 extern const char *lhd_decl_printable_name (tree, int);
 extern rtx lhd_expand_expr (tree, rtx, enum machine_mode, int);
+extern struct llvm_value *lhd_llvm_expand_expr(struct llvm_function *, tree,
+                                               struct llvm_value*);
+extern struct llvm_value *lhd_llvm_expand_lvalue_expr(struct llvm_function *,
+                                                      tree, unsigned*,
+                                                      unsigned*);
+extern void lhd_llvm_expand_stmt(struct llvm_function *, tree);
 extern void lhd_print_error_function (struct diagnostic_context *,
 				      const char *);
 extern void lhd_set_decl_assembler_name (tree);
@@ -96,6 +105,9 @@ extern void lhd_initialize_diagnostics (struct diagnostic_context *);
 #define LANG_HOOKS_GET_ALIAS_SET	lhd_get_alias_set
 #define LANG_HOOKS_EXPAND_CONSTANT	lhd_return_tree
 #define LANG_HOOKS_EXPAND_EXPR		lhd_expand_expr
+#define LANG_HOOKS_LLVM_EXPAND_EXPR	lhd_llvm_expand_expr
+#define LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR	lhd_llvm_expand_lvalue_expr
+#define LANG_HOOKS_LLVM_EXPAND_STMT	lhd_llvm_expand_stmt
 #define LANG_HOOKS_SAFE_FROM_P		lhd_safe_from_p
 #define LANG_HOOKS_FINISH_INCOMPLETE_DECL lhd_do_nothing_t
 #define LANG_HOOKS_UNSAFE_FOR_REEVAL	lhd_unsafe_for_reeval
@@ -259,6 +271,9 @@ extern int lhd_tree_dump_type_quals (tree);
   LANG_HOOKS_GET_ALIAS_SET, \
   LANG_HOOKS_EXPAND_CONSTANT, \
   LANG_HOOKS_EXPAND_EXPR, \
+  LANG_HOOKS_LLVM_EXPAND_EXPR, \
+  LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR, \
+  LANG_HOOKS_LLVM_EXPAND_STMT, \
   LANG_HOOKS_TRUTHVALUE_CONVERSION, \
   LANG_HOOKS_SAFE_FROM_P, \
   LANG_HOOKS_FINISH_INCOMPLETE_DECL, \

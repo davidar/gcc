@@ -47,6 +47,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "intl.h"
 #include "tm_p.h"
+#include "llvm-out.h"
 
 /* Decide whether a function's arguments should be processed
    from first to last or from last to first.
@@ -6586,6 +6587,8 @@ expand_expr (tree exp, rtx target, enum machine_mode tmode, enum expand_modifier
   rtx subtarget, original_target;
   int ignore;
   tree context;
+
+  LLVM_SHOULD_NOT_CALL();
 
   /* Handle ERROR_MARK before anybody tries to access its type.  */
   if (TREE_CODE (exp) == ERROR_MARK || TREE_CODE (type) == ERROR_MARK)

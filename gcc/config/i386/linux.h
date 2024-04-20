@@ -199,6 +199,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Used by crtstuff.c to initialize the base of data-relative relocations.
    These are GOT relative on x86, so return the pic register.  */
+#if !EMIT_LLVM
 #ifdef __PIC__
 #define CRT_GET_RFIB_DATA(BASE)			\
   {						\
@@ -215,6 +216,7 @@ Boston, MA 02111-1307, USA.  */
 	      offset being off by one.  */				\
 	   "addl\t$_GLOBAL_OFFSET_TABLE_+[.-.LPR%=],%0"			\
 	   : "=d"(BASE))
+#endif
 #endif
 
 #undef NEED_INDICATE_EXEC_STACK

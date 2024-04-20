@@ -51,6 +51,7 @@ Boston, MA 02111-1307, USA.  */
 #include "diagnostic.h"
 #include "debug.h"
 #include "timevar.h"
+#include "llvm-out.h"
 
 static tree grokparms (tree);
 static const char *redeclaration_error_message (tree, tree);
@@ -2962,7 +2963,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	    return 0;
 
 	  /* Replace the old RTL to avoid problems with inlining.  */
-	  SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+          if (DECL_RTL_SET_P(newdecl))
+            SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+          SET_DECL_LLVM(olddecl, DECL_LLVM(newdecl));
 	}
       /* Even if the types match, prefer the new declarations type
 	 for anticipated built-ins, for exception lists, etc...  */
@@ -2980,7 +2983,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	     that all remnants of the builtin-ness of this function
 	     will be banished.  */
 	  SET_DECL_LANGUAGE (olddecl, DECL_LANGUAGE (newdecl));
-	  SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+          if (DECL_RTL_SET_P(newdecl))
+            SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+          SET_DECL_LLVM(olddecl, DECL_LLVM(newdecl));
 	}
     }
   else if (TREE_CODE (olddecl) != TREE_CODE (newdecl))
@@ -3383,7 +3388,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	  DECL_IS_MALLOC (newdecl) |= DECL_IS_MALLOC (olddecl);
 	  DECL_IS_PURE (newdecl) |= DECL_IS_PURE (olddecl);
 	  /* Keep the old RTL.  */
-	  COPY_DECL_RTL (olddecl, newdecl);
+          if (DECL_RTL_SET_P(newdecl))
+            COPY_DECL_RTL (olddecl, newdecl);
+          COPY_DECL_LLVM(olddecl, newdecl);
 	}
       else if (TREE_CODE (newdecl) == VAR_DECL 
 	       && (DECL_SIZE (olddecl) || !DECL_SIZE (newdecl)))
@@ -3392,7 +3399,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	     declaration was for an incomplete object and the new
 	     declaration is not since many attributes of the RTL will
 	     change.  */
-	  COPY_DECL_RTL (olddecl, newdecl);
+          if (DECL_RTL_SET_P(newdecl))
+            COPY_DECL_RTL (olddecl, newdecl);
+          COPY_DECL_LLVM(olddecl, newdecl);
 	}
     }
   /* If cannot merge, then use the new type and qualifiers,
@@ -3504,7 +3513,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	{
 	  SET_DECL_LANGUAGE (olddecl, DECL_LANGUAGE (newdecl));
 	  COPY_DECL_ASSEMBLER_NAME (newdecl, olddecl);
-	  SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+          if (DECL_RTL_SET_P(newdecl))
+            SET_DECL_RTL (olddecl, DECL_RTL (newdecl));
+	  SET_DECL_LLVM(olddecl, DECL_LLVM(newdecl));
 	}
       if (! types_match || new_defines_function)
 	{
@@ -3528,7 +3539,9 @@ duplicate_decls (tree newdecl, tree olddecl)
 	      DECL_FUNCTION_CODE (newdecl) = DECL_FUNCTION_CODE (olddecl);
 	      /* If we're keeping the built-in definition, keep the rtl,
 		 regardless of declaration matches.  */
-	      SET_DECL_RTL (newdecl, DECL_RTL (olddecl));
+              if (DECL_RTL_SET_P(olddecl))
+                SET_DECL_RTL (newdecl, DECL_RTL (olddecl));
+              SET_DECL_LLVM(olddecl, DECL_LLVM(newdecl));
 	    }
 	  else
 	    DECL_ESTIMATED_INSNS (newdecl) = DECL_ESTIMATED_INSNS (olddecl);
@@ -6496,7 +6509,10 @@ builtin_function_1 (const char* name,
      function in the namespace.  */
   if (libname)
     SET_DECL_ASSEMBLER_NAME (decl, get_identifier (libname));
-  make_decl_rtl (decl, NULL);
+  if (EMIT_LLVM)
+    llvm_make_decl_llvm(decl, NULL);
+  else
+    make_decl_rtl (decl, NULL);
 
   /* Warn if a function in the namespace for users
      is used without an occasion to consider it declared.  */
@@ -8108,7 +8124,9 @@ cp_finish_decl (tree decl, tree init, tree asmspec_tree, int flags)
     {
       /* This must override the asm specifier which was placed by
 	 grokclassfn.  Lay this out fresh.  */
-      SET_DECL_RTL (TREE_TYPE (decl), NULL_RTX);
+      LLVM_TODO_TREE(decl);
+      if (DECL_RTL_SET_P(decl))
+        SET_DECL_RTL (TREE_TYPE (decl), NULL_RTX);
       SET_DECL_ASSEMBLER_NAME (decl, get_identifier (asmspec));
       make_decl_rtl (decl, asmspec);
     }

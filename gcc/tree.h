@@ -26,6 +26,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "version.h"
 #include "input.h"
 
+struct llvm_value;
+
 /* Codes of tree nodes */
 
 #define DEFTREECODE(SYM, STRING, TYPE, NARGS)   SYM,
@@ -779,7 +781,7 @@ struct tree_vec GTY(())
 /* In a SAVE_EXPR node.  */
 #define SAVE_EXPR_CONTEXT(NODE) TREE_OPERAND_CHECK_CODE (NODE, SAVE_EXPR, 1)
 #define SAVE_EXPR_RTL(NODE) TREE_RTL_OPERAND_CHECK (NODE, SAVE_EXPR, 2)
-
+#define SAVE_EXPR_LLVM(NODE) (*(struct llvm_value**) &SAVE_EXPR_CHECK(NODE)->exp.operands[3])
 #define SAVE_EXPR_NOPLACEHOLDER(NODE) TREE_UNSIGNED (SAVE_EXPR_CHECK (NODE))
 /* Nonzero if the SAVE_EXPRs value should be kept, even if it occurs
    both in normal code and in a handler.  (Normally, in a handler, all
@@ -1353,16 +1355,44 @@ struct tree_type GTY(())
   (DECL_CHECK (NODE)->decl.rtl				\
    ? (NODE)->decl.rtl					\
    : (make_decl_rtl (NODE, NULL), (NODE)->decl.rtl))
+
 /* Set the DECL_RTL for NODE to RTL.  */
 #define SET_DECL_RTL(NODE, RTL) set_decl_rtl (NODE, RTL)
+
 /* Returns nonzero if the DECL_RTL for NODE has already been set.  */
 #define DECL_RTL_SET_P(NODE)  (DECL_CHECK (NODE)->decl.rtl != NULL)
+
+
 /* Copy the RTL from NODE1 to NODE2.  If the RTL was not set for
    NODE1, it will not be set for NODE2; this is a lazy copy.  */
 #define COPY_DECL_RTL(NODE1, NODE2) \
   (DECL_CHECK (NODE2)->decl.rtl = DECL_CHECK (NODE1)->decl.rtl)
 /* The DECL_RTL for NODE, if it is set, or NULL, if it is not set.  */
 #define DECL_RTL_IF_SET(NODE) (DECL_RTL_SET_P (NODE) ? DECL_RTL (NODE) : NULL)
+
+/* Return the LLVM value for the specified declaration.
+
+   This value can be evaluated lazily for functions, variables with
+   static storage duration, and labels.  */
+#define DECL_LLVM(NODE)  \
+  (DECL_CHECK (NODE)->decl.llvm				\
+   ? (NODE)->decl.llvm					\
+   : (llvm_get_or_make_decl_llvm (NODE, NULL), (NODE)->decl.llvm))
+
+/* Set the DECL_LLVM for NODE to LLVM.  */
+#define SET_DECL_LLVM(NODE, LLVM) \
+  do { DECL_CHECK (NODE)->decl.llvm = LLVM; } while (0)
+
+/* Returns nonzero if the DECL_LLVM for NODE has already been set.  */
+#define DECL_LLVM_SET_P(NODE)  (DECL_CHECK (NODE)->decl.llvm != NULL)
+
+/* Copy the LLVM from NODE1 to NODE2.  If the LLVM was not set for
+   NODE1, it will not be set for NODE2; this is a lazy copy.  */
+#define COPY_DECL_LLVM(NODE1, NODE2) \
+  (DECL_CHECK (NODE2)->decl.llvm = DECL_CHECK (NODE1)->decl.llvm)
+
+#define DECL_LLVM_IF_SET(NODE) (DECL_LLVM_SET_P (NODE) ? DECL_LLVM (NODE): NULL)
+
 
 /* For PARM_DECL, holds an RTL for the stack slot or register
    where the data was actually passed.  */
@@ -1703,6 +1733,7 @@ struct tree_decl GTY(())
   tree section_name;
   tree attributes;
   rtx rtl;	/* RTL representation for object.  */
+  struct llvm_value *GTY((skip (""))) llvm;/* LLVM representation for object. */
 
   /* In FUNCTION_DECL, if it is inline, holds the saved insn chain.
      In FIELD_DECL, is DECL_FIELD_BIT_OFFSET.
@@ -2922,6 +2953,8 @@ extern int flags_from_decl_or_type (tree);
 extern int setjmp_call_p (tree);
 extern bool alloca_call_p (tree);
 
+extern int longjmp_call_p (tree);
+
 /* In attribs.c.  */
 
 /* Process the attributes listed in ATTRIBUTES and install them in *NODE,
@@ -2955,6 +2988,10 @@ enum symbol_visibility decl_visibility (tree);
 extern void resolve_unique_section (tree, int, int);
 extern void mark_referenced (tree);
 extern void notice_global_symbol (tree);
+
+extern void llvm_make_decl_llvm(union tree_node *decl, const char *asmspec);
+extern void llvm_get_or_make_decl_llvm(union tree_node *decl,
+                                       const char *asmspec);
 
 /* In stmt.c */
 extern void emit_nop (void);

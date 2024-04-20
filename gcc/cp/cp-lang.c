@@ -70,6 +70,12 @@ static void cxx_initialize_diagnostics (diagnostic_context *);
 #define LANG_HOOKS_EXPAND_CONSTANT cplus_expand_constant
 #undef LANG_HOOKS_EXPAND_EXPR
 #define LANG_HOOKS_EXPAND_EXPR cxx_expand_expr
+#undef LANG_HOOKS_LLVM_EXPAND_EXPR
+#define LANG_HOOKS_LLVM_EXPAND_EXPR cxx_llvm_expand_expr
+#undef LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR
+#define LANG_HOOKS_LLVM_EXPAND_LVALUE_EXPR cxx_llvm_expand_lvalue_expr
+#undef LANG_HOOKS_LLVM_EXPAND_STMT
+#define LANG_HOOKS_LLVM_EXPAND_STMT cxx_llvm_expand_stmt
 #undef LANG_HOOKS_SAFE_FROM_P
 #define LANG_HOOKS_SAFE_FROM_P c_safe_from_p
 #undef LANG_HOOKS_PARSE_FILE

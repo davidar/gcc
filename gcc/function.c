@@ -62,6 +62,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "integrate.h"
 #include "langhooks.h"
+#include "llvm-out.h"
 
 #ifndef TRAMPOLINE_ALIGNMENT
 #define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
@@ -6283,7 +6284,8 @@ prepare_function_start (void)
   max_parm_reg = LAST_VIRTUAL_REGISTER + 1;
 
   /* Initialize the RTL mechanism.  */
-  init_emit ();
+  if (!EMIT_LLVM)
+    init_emit ();
 
   /* Initialize the queue of pending postincrement and postdecrements,
      and some other info in expr.c.  */
@@ -6292,7 +6294,8 @@ prepare_function_start (void)
   /* We haven't done register allocation yet.  */
   reg_renumber = 0;
 
-  init_varasm_status (cfun);
+  if (!EMIT_LLVM)
+    init_varasm_status (cfun);
 
   /* Clear out data used for inlining.  */
   cfun->inlinable = 0;
@@ -6406,20 +6409,22 @@ init_function_start (tree subr)
     = (decl_function_context (current_function_decl) != 0
        && ! DECL_NO_STATIC_CHAIN (current_function_decl));
 
-  /* Within function body, compute a type's size as soon it is laid out.  */
-  immediate_size_expand++;
+  if (!EMIT_LLVM) {
+    /* Within function body, compute a type's size as soon it is laid out.  */
+    immediate_size_expand++;
 
-  /* Prevent ever trying to delete the first instruction of a
-     function.  Also tell final how to output a linenum before the
-     function prologue.  Note linenums could be missing, e.g. when
-     compiling a Java .class file.  */
-  if (DECL_SOURCE_LINE (subr))
-    emit_line_note (DECL_SOURCE_LOCATION (subr));
+    /* Prevent ever trying to delete the first instruction of a
+       function.  Also tell final how to output a linenum before the
+       function prologue.  Note linenums could be missing, e.g. when
+       compiling a Java .class file.  */
+    if (DECL_SOURCE_LINE (subr))
+      emit_line_note (DECL_SOURCE_LOCATION (subr));
 
-  /* Make sure first insn is a note even if we don't want linenums.
-     This makes sure the first insn will never be deleted.
-     Also, final expects a note to appear there.  */
-  emit_note (NOTE_INSN_DELETED);
+    /* Make sure first insn is a note even if we don't want linenums.
+       This makes sure the first insn will never be deleted.
+       Also, final expects a note to appear there.  */
+    emit_note (NOTE_INSN_DELETED);
+  }
 
   /* Set flags used by final.c.  */
   if (aggregate_value_p (DECL_RESULT (subr)))
@@ -6429,13 +6434,13 @@ init_function_start (tree subr)
 #endif
       current_function_returns_struct = 1;
     }
-
+  
   /* Warn if this value is an aggregate type,
      regardless of which calling convention we are using for it.  */
   if (warn_aggregate_return
       && AGGREGATE_TYPE_P (TREE_TYPE (DECL_RESULT (subr))))
     warning ("function returns an aggregate");
-
+  
   current_function_returns_pointer
     = POINTER_TYPE_P (TREE_TYPE (DECL_RESULT (subr)));
 }
@@ -6832,12 +6837,13 @@ expand_function_end (void)
   tree link;
   rtx clobber_after;
 
-  finish_expr_for_function ();
+  LLVM_SHOULD_NOT_CALL();
 
   /* If arg_pointer_save_area was referenced only from a nested
      function, we will not have initialized it yet.  Do that now.  */
-  if (arg_pointer_save_area && ! cfun->arg_pointer_save_area_init)
+  if (arg_pointer_save_area && ! cfun->arg_pointer_save_area_init) {
     get_arg_pointer_save_area (cfun);
+  }
 
 #ifdef NON_SAVING_SETJMP
   /* Don't put any variables in registers if we call setjmp
@@ -6845,7 +6851,7 @@ expand_function_end (void)
   if (NON_SAVING_SETJMP && current_function_calls_setjmp)
     {
       if (DECL_INITIAL (current_function_decl) != error_mark_node)
-	setjmp_protect (DECL_INITIAL (current_function_decl));
+        setjmp_protect (DECL_INITIAL (current_function_decl));
 
       setjmp_protect_args ();
     }
@@ -6864,13 +6870,13 @@ expand_function_end (void)
 
 #ifdef TRAMPOLINE_TEMPLATE
       /* First make sure this compilation has a template for
-	 initializing trampolines.  */
+         initializing trampolines.  */
       if (initial_trampoline == 0)
-	{
-	  initial_trampoline
-	    = gen_rtx_MEM (BLKmode, assemble_trampoline_template ());
-	  set_mem_align (initial_trampoline, TRAMPOLINE_ALIGNMENT);
-	}
+        {
+          initial_trampoline
+            = gen_rtx_MEM (BLKmode, assemble_trampoline_template ());
+          set_mem_align (initial_trampoline, TRAMPOLINE_ALIGNMENT);
+        }
 #endif
 
       /* Generate insns to initialize the trampoline.  */
@@ -6879,7 +6885,7 @@ expand_function_end (void)
 #ifdef TRAMPOLINE_TEMPLATE
       blktramp = replace_equiv_address (initial_trampoline, tramp);
       emit_block_move (blktramp, initial_trampoline,
-		       GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+                       GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
 #endif
       trampolines_created = 1;
       INITIALIZE_TRAMPOLINE (tramp, XEXP (DECL_RTL (function), 0), context);
@@ -6898,16 +6904,16 @@ expand_function_end (void)
       rtx insn, seq;
 
       for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
-	if (GET_CODE (insn) == CALL_INSN)
-	  {
-	    start_sequence ();
-	    probe_stack_range (STACK_CHECK_PROTECT,
-			       GEN_INT (STACK_CHECK_MAX_FRAME_SIZE));
-	    seq = get_insns ();
-	    end_sequence ();
-	    emit_insn_before (seq, tail_recursion_reentry);
-	    break;
-	  }
+        if (GET_CODE (insn) == CALL_INSN)
+          {
+            start_sequence ();
+            probe_stack_range (STACK_CHECK_PROTECT,
+                               GEN_INT (STACK_CHECK_MAX_FRAME_SIZE));
+            seq = get_insns ();
+            end_sequence ();
+            emit_insn_before (seq, tail_recursion_reentry);
+            break;
+          }
     }
 
   /* Possibly warn about unused parameters.  */
@@ -6925,8 +6931,9 @@ expand_function_end (void)
 
   /* Delete handlers for nonlocal gotos if nothing uses them.  */
   if (nonlocal_goto_handler_slots != 0
-      && ! current_function_has_nonlocal_label)
+      && ! current_function_has_nonlocal_label) {
     delete_handlers ();
+  }
 
   /* End any sequences that failed to be closed due to syntax errors.  */
   while (in_sequence_p ())
@@ -6979,15 +6986,15 @@ expand_function_end (void)
     {
       rtx fun = DECL_RTL (current_function_decl);
       if (GET_CODE (fun) == MEM)
-	fun = XEXP (fun, 0);
+        fun = XEXP (fun, 0);
       else
-	abort ();
+        abort ();
       emit_library_call (profile_function_exit_libfunc, LCT_NORMAL, VOIDmode,
-			 2, fun, Pmode,
-			 expand_builtin_return_addr (BUILT_IN_RETURN_ADDRESS,
-						     0,
-						     hard_frame_pointer_rtx),
-			 Pmode);
+                         2, fun, Pmode,
+                         expand_builtin_return_addr (BUILT_IN_RETURN_ADDRESS,
+                                                     0,
+                                                     hard_frame_pointer_rtx),
+                         Pmode);
     }
 
   /* Let except.c know where it should emit the call to unregister
@@ -7003,10 +7010,10 @@ expand_function_end (void)
 #endif
     if (current_function_calls_alloca)
       {
-	rtx tem = 0;
+        rtx tem = 0;
 
-	emit_stack_save (SAVE_FUNCTION, &tem, parm_birth_insn);
-	emit_stack_restore (SAVE_FUNCTION, tem, NULL_RTX);
+        emit_stack_save (SAVE_FUNCTION, &tem, parm_birth_insn);
+        emit_stack_restore (SAVE_FUNCTION, tem, NULL_RTX);
       }
 
   /* If scalar return value was computed in a pseudo-reg, or was a named
@@ -7128,11 +7135,11 @@ expand_function_end (void)
      sh mach_dep_reorg) that still try and compute their own lifetime info
      instead of using the general framework.  */
   use_return_register ();
-
+    
   /* Fix up any gotos that jumped out to the outermost
      binding level of the function.
      Must follow emitting RETURN_LABEL.  */
-
+    
   /* If you have any cleanups to do at this point,
      and they need to create temporary variables,
      then you will lose.  */

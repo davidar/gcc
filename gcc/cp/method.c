@@ -36,6 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "tm_p.h"
 #include "target.h"
+#include "llvm-out.h"
 
 /* Various flags to control the mangling process.  */
 
@@ -327,6 +328,10 @@ use_thunk (tree thunk_fndecl, bool emit_p)
   if (!emit_p)
     return;
 
+  if (EMIT_LLVM) {
+    alias = function;
+  } else
+
 #ifdef ASM_OUTPUT_DEF
   alias = make_alias_for_thunk (function);
 #else
@@ -382,7 +387,7 @@ use_thunk (tree thunk_fndecl, bool emit_p)
   DECL_INITIAL (thunk_fndecl) = make_node (BLOCK);
   BLOCK_VARS (DECL_INITIAL (thunk_fndecl)) = DECL_ARGUMENTS (thunk_fndecl);
   
-  if (this_adjusting
+  if (this_adjusting && !EMIT_LLVM  /* LLVM doesn't support thunks! */
       && targetm.asm_out.can_output_mi_thunk (thunk_fndecl, fixed_offset,
 					      virtual_value, alias))
     {

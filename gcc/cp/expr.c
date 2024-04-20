@@ -33,6 +33,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "except.h"
 #include "tm_p.h"
+#include "llvm-internals.h"
 
 /* Hook used by output_constant to expand language-specific
    constants.  */
@@ -124,4 +125,55 @@ cxx_expand_expr (tree exp, rtx target, enum machine_mode tmode, int modifier)
   abort ();
   /* NOTREACHED */
   return NULL;
+}
+
+struct llvm_value* cxx_llvm_expand_lvalue_expr(struct llvm_function *Fn,
+                                               tree exp, unsigned *BitStart,
+                                               unsigned *BitSize) {
+  switch (TREE_CODE (exp)) {
+  case PTRMEM_CST:
+    return llvm_expand_lvalue_expr(Fn, cplus_expand_constant(exp), BitStart,
+                                   BitSize);
+
+  case EMPTY_CLASS_EXPR:
+    return llvm_get_empty_class_pointer(Fn, TREE_TYPE(exp));
+
+  default:
+    return c_llvm_expand_lvalue_expr(Fn, exp, BitStart, BitSize);
+  }
+}
+
+
+/* cxx_llvm_expand_expr - Hook used by llvm_expand_expr to expand C++
+   language-specific tree codes.  */
+struct llvm_value *cxx_llvm_expand_expr(struct llvm_function *Fn, tree exp,
+                                        struct llvm_value *DestLoc) {
+  struct llvm_value *ret;
+  
+  switch (TREE_CODE(exp)) {
+  case PTRMEM_CST:
+    return llvm_expand_expr(Fn, cplus_expand_constant(exp), DestLoc);
+
+  case THROW_EXPR:
+    llvm_expand_expr(Fn, TREE_OPERAND (exp, 0), 0);
+    /* LLVM throw functions do not perform the stack unwinding implicitly */
+    llvm_emit_code_for_throw(Fn);
+    return 0;
+
+  case MUST_NOT_THROW_EXPR:
+    llvm_expand_eh_region_start(Fn);
+    ret = llvm_expand_expr(Fn, TREE_OPERAND (exp, 0), 0);
+    llvm_expand_eh_region_end_must_not_throw(Fn, build_call(terminate_node, 0));
+    return ret;
+
+  case EMPTY_CLASS_EXPR:
+    /* We don't need to emit any code for empty classes */
+    return 0;
+
+  case BASELINK:
+  default:
+    return c_llvm_expand_expr (Fn, exp, DestLoc);
+  }
+  abort ();
+  return 0; /* NOTREACHED */
 }

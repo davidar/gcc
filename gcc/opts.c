@@ -38,6 +38,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"		/* For OPTIMIZATION_OPTIONS.  */
 #include "insn-attr.h"		/* For INSN_SCHEDULING.  */
 
+#include "llvm-out.h"
+
 /* Value of the -G xx switch, and whether it was passed or not.  */
 unsigned HOST_WIDE_INT g_switch_value;
 bool g_switch_set;
@@ -563,7 +565,8 @@ decode_options (unsigned int argc, const char **argv)
       flag_inline_functions = 1;
       flag_rename_registers = 1;
       flag_unswitch_loops = 1;
-      flag_unit_at_a_time = 1;
+      if (!EMIT_LLVM)
+        flag_unit_at_a_time = 1;
     }
 
   if (optimize < 2 || optimize_size)

@@ -79,6 +79,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "opts.h"
 #include "coverage.h"
 
+#include "llvm-out.h"
+
 #if defined (DWARF2_UNWIND_INFO) || defined (DWARF2_DEBUGGING_INFO)
 #include "dwarf2out.h"
 #endif
@@ -119,7 +121,7 @@ static void compile_file (void);
 static int print_single_switch (FILE *, int, int, const char *,
 				const char *, const char *,
 				const char *, const char *);
-static void print_switch_values (FILE *, int, int, const char *,
+void print_switch_values (FILE *, int, int, const char *,
 				 const char *, const char *);
 
 /* Rest of compilation helper functions.  */
@@ -221,7 +223,7 @@ int target_flags_explicit;
 
 /* Debug hooks - dependent upon command line options.  */
 
-const struct gcc_debug_hooks *debug_hooks;
+const struct gcc_debug_hooks *debug_hooks = &do_nothing_debug_hooks;
 
 /* Describes a dump file.  */
 
@@ -1779,6 +1781,10 @@ compile_file (void)
       timevar_pop (TV_DUMP);
     }
 
+  if (EMIT_LLVM) {
+    llvm_emit_final_program(version_string);
+    return;
+  }
   targetm.asm_out.file_end ();
 
   /* Attach a special .ident directive to the end of the file to identify
@@ -1787,7 +1793,7 @@ compile_file (void)
 #ifdef IDENT_ASM_OP
   if (!flag_no_ident)
     fprintf (asm_out_file, "%s\"GCC: (GNU) %s\"\n",
-	     IDENT_ASM_OP, version_string);
+             IDENT_ASM_OP, version_string);
 #endif
 
   if (optimize > 0 && open_dump_file (DFI_combine, NULL))
@@ -1838,8 +1844,12 @@ rest_of_decl_compilation (tree decl,
     {
       timevar_push (TV_VARCONST);
 
-      if (asmspec)
-	make_decl_rtl (decl, asmspec);
+      if (asmspec) {
+        if (EMIT_LLVM)
+          llvm_make_decl_llvm(decl, asmspec);
+        else
+          make_decl_rtl (decl, asmspec);
+      }
 
       /* Don't output anything when a tentative file-scope definition
 	 is seen.  But at end of compilation, do output code for them.  */
@@ -1866,6 +1876,7 @@ rest_of_decl_compilation (tree decl,
     {
       if (decode_reg_name (asmspec) >= 0)
 	{
+          LLVM_TODO_TREE(decl);
 	  SET_DECL_RTL (decl, NULL_RTX);
 	  make_decl_rtl (decl, asmspec);
 	}
@@ -1877,6 +1888,9 @@ rest_of_decl_compilation (tree decl,
 	    expand_decl (decl);
 	}
     }
+  else if (EMIT_LLVM) {
+    /* Do not send to debugging */
+  }
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
   else if ((write_symbols == DBX_DEBUG || write_symbols == XCOFF_DEBUG)
 	   && TREE_CODE (decl) == TYPE_DECL)
@@ -1927,6 +1941,8 @@ rest_of_type_compilation (
   if (errorcount != 0 || sorrycount != 0)
     return;
 
+  if (EMIT_LLVM) return;
+
   timevar_push (TV_SYMOUT);
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
   if (write_symbols == DBX_DEBUG || write_symbols == XCOFF_DEBUG)
@@ -1975,6 +1991,8 @@ rest_of_handle_final (tree decl, rtx insns)
        the ".endp" directive that closes the procedure descriptor.  */
     output_function_exception_table ();
 #endif
+
+    LLVM_SHOULD_NOT_CALL();
 
     assemble_end_function (decl, fnname);
 
@@ -3810,7 +3828,7 @@ print_single_switch (FILE *file, int pos, int max,
    Each line begins with INDENT and ends with TERM.
    Each switch is separated from the next by SEP.  */
 
-static void
+void
 print_switch_values (FILE *file, int pos, int max,
 		     const char *indent, const char *sep, const char *term)
 {
@@ -4184,6 +4202,9 @@ process_options (void)
     error ("target system does not support the \"%s\" debug format",
 	   debug_type_names[write_symbols]);
 
+  if (EMIT_LLVM)     /* Disable debug output for LLVM output */
+    debug_hooks = &do_nothing_debug_hooks;
+
   /* If auxiliary info generation is desired, open the output file.
      This goes in the same directory as the source file--unlike
      all the other output files.  */
@@ -4252,12 +4273,15 @@ backend_init (void)
 {
   init_emit_once (debug_info_level == DINFO_LEVEL_NORMAL
 		  || debug_info_level == DINFO_LEVEL_VERBOSE
+
 #ifdef VMS_DEBUGGING_INFO
 		    /* Enable line number info for traceback.  */
 		    || debug_info_level > DINFO_LEVEL_NONE
 #endif
 		    || flag_test_coverage
 		    || warn_notreached);
+
+  if (EMIT_LLVM) return;   /* LLVM must call init_emit_once */
 
   init_regs ();
   init_fake_stack_mems ();
@@ -4283,9 +4307,17 @@ lang_dependent_init (const char *name)
   if (dump_base_name == 0)
     dump_base_name = name ? name : "gccdump";
 
+  if (EMIT_LLVM)
+    llvm_init_codegen();
+
   /* Other front-end initialization.  */
   if ((*lang_hooks.init) () == 0)
     return 0;
+
+  if (EMIT_LLVM) {
+    llvm_init_asm_output(name);
+    return 1;   /* Don't perform rtx specific initialization below! */
+  }
 
   init_asm_output (name);
 
@@ -4451,3 +4483,4 @@ toplev_main (unsigned int argc, const char **argv)
 
   return (SUCCESS_EXIT_CODE);
 }
+

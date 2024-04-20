@@ -57,6 +57,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "ggc.h"
 #include "debug.h"
 #include "langhooks.h"
+#include "llvm-out.h"
 
 /* Commonly used modes.  */
 
@@ -4676,7 +4677,8 @@ rtx
 emit_line_note (location_t location)
 {
   rtx note;
-  
+  if (EMIT_LLVM) return 0;
+
   set_file_and_line_for_stmt (location);
   
   if (location.file && last_location.file
@@ -4703,6 +4705,7 @@ rtx
 emit_note_copy (rtx orig)
 {
   rtx note;
+  LLVM_SHOULD_NOT_CALL();
   
   if (NOTE_LINE_NUMBER (orig) >= 0 && no_line_numbers)
     {

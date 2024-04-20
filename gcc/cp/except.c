@@ -37,13 +37,14 @@ Boston, MA 02111-1307, USA.  */
 #include "except.h"
 #include "toplev.h"
 #include "tree-inline.h"
+#include "llvm-out.h"
 
-static void push_eh_cleanup (tree);
+static void push_eh_cleanup (tree, tree);
 static tree prepare_eh_type (tree);
 static tree build_eh_type_type (tree);
 static tree do_begin_catch (void);
 static int dtor_nothrow (tree);
-static tree do_end_catch (tree);
+static tree do_end_catch (tree, tree);
 static bool decl_is_java_type (tree decl, int err);
 static void initialize_handler_parm (tree, tree);
 static tree do_allocate_exception (tree);
@@ -77,9 +78,10 @@ init_exception_processing (void)
   call_unexpected_node
     = push_throw_library_fn (get_identifier ("__cxa_call_unexpected"), tmp);
 
-  eh_personality_libfunc = init_one_libfunc (USING_SJLJ_EXCEPTIONS
-					     ? "__gxx_personality_sj0"
-					     : "__gxx_personality_v0");
+  if (!EMIT_LLVM)
+    eh_personality_libfunc = init_one_libfunc (USING_SJLJ_EXCEPTIONS
+                                               ? "__gxx_personality_sj0"
+                                               : "__gxx_personality_v0");
 
   lang_eh_runtime_type = build_eh_type_type;
   lang_protect_cleanup_actions = &cp_protect_cleanup_actions;
@@ -159,8 +161,11 @@ static tree
 do_begin_catch (void)
 {
   tree fn;
-
+  
+  LLVM_SHOULD_NOT_CALL();
+  
   fn = get_identifier ("__cxa_begin_catch");
+
   if (IDENTIFIER_GLOBAL_VALUE (fn))
     fn = IDENTIFIER_GLOBAL_VALUE (fn);
   else
@@ -193,22 +198,38 @@ dtor_nothrow (tree type)
    for the current catch block if no others are currently using it.  */
 
 static tree
-do_end_catch (tree type)
+do_end_catch (tree type, tree exception)
 {
   tree fn, cleanup;
 
-  fn = get_identifier ("__cxa_end_catch");
+  if (EMIT_LLVM)
+    fn = get_identifier ("__llvm_cxxeh_end_catch");
+  else
+    fn = get_identifier ("__cxa_end_catch");
+
   if (IDENTIFIER_GLOBAL_VALUE (fn))
     fn = IDENTIFIER_GLOBAL_VALUE (fn);
   else
     {
-      /* Declare void __cxa_end_catch ().  */
-      fn = push_void_library_fn (fn, void_list_node);
+      if (EMIT_LLVM) {
+        /* Declare void ...end_catch(void*) */
+        tree tmp = tree_cons (NULL_TREE, ptr_type_node, void_list_node);
+        fn = push_library_fn (fn, build_function_type (void_type_node,
+                                                       tmp));
+      } else {
+        /* Declare void __cxa_end_catch ().  */
+        fn = push_void_library_fn (fn, void_list_node);
+      }
       /* This can throw if the destructor for the exception throws.  */
       TREE_NOTHROW (fn) = 0;
     }
 
-  cleanup = build_function_call (fn, NULL_TREE);
+  if (EMIT_LLVM)
+    cleanup = build_function_call (fn, tree_cons(NULL_TREE, exception,
+                                                 NULL_TREE));
+  else
+    cleanup = build_function_call (fn, NULL_TREE);
+
   TREE_NOTHROW (cleanup) = dtor_nothrow (type);
 
   return cleanup;
@@ -217,9 +238,9 @@ do_end_catch (tree type)
 /* This routine creates the cleanup for the current exception.  */
 
 static void
-push_eh_cleanup (tree type)
+push_eh_cleanup (tree type, tree exception)
 {
-  finish_decl_cleanup (NULL_TREE, do_end_catch (type));
+  finish_decl_cleanup (NULL_TREE, do_end_catch (type, exception));
 }
 
 /* Return nonzero value if DECL is a Java type suitable for catch or
@@ -377,12 +398,13 @@ initialize_handler_parm (tree decl, tree exp)
 		  LOOKUP_ONLYCONVERTING|DIRECT_BIND);
 }
 
+
 /* Call this to start a catch block.  DECL is the catch parameter.  */
 
 tree
 expand_start_catch_block (tree decl)
 {
-  tree exp = NULL_TREE;
+  tree exp = NULL_TREE, ExceptionCaught = NULL_TREE;
   tree type;
   bool is_java;
 
@@ -405,6 +427,7 @@ expand_start_catch_block (tree decl)
 
       if (decl_is_java_type (type, 1))
 	{
+          LLVM_TODO_TREE(type);
 	  /* Java only passes object via pointer and doesn't require
 	     adjusting.  The java object is immediately before the
 	     generic exception header.  */
@@ -415,6 +438,35 @@ expand_start_catch_block (tree decl)
 	  init = build_indirect_ref (init, NULL);
 	  is_java = true;
 	}
+      else if (EMIT_LLVM)
+        {
+          /* LLVM requires that we call
+           * __llvm_cxxeh_begin_catch_if_isa to both determine
+           * whether this catch block is appropriate for the current exception
+           * caught, as well as to transform the pointer if necessary.  Because
+           * of the way that GCC is structured, this is hard to do
+           * appropriately.  We compromise by building a call to this function
+           * which provides the pointer or null.  In the llvm_expand_catch_block
+           * we search out the call to this function, and add the conditional
+           * branch as required.
+           */
+          tree rttitype = lang_eh_runtime_type(type);
+          tree fn = get_identifier ("__llvm_cxxeh_begin_catch_if_isa");
+
+          if (IDENTIFIER_GLOBAL_VALUE (fn))
+            fn = IDENTIFIER_GLOBAL_VALUE (fn);
+          else
+            {
+              /* Declare void* __llv_... (void*).  */
+              tree tmp = tree_cons (NULL_TREE, ptr_type_node, void_list_node);
+              fn = push_library_fn (fn, build_function_type (ptr_type_node,
+                                                             tmp));
+            }
+
+          /* emit the call to catch_if_isa */
+          init = build_function_call (fn, tree_cons(NULL_TREE, rttitype,
+                                                    NULL_TREE));
+        }
       else
 	{
 	  /* C++ requires that we call __cxa_begin_catch to get the
@@ -426,14 +478,59 @@ expand_start_catch_block (tree decl)
       DECL_REGISTER (exp) = 1;
       cp_finish_decl (exp, init, NULL_TREE, LOOKUP_ONLYCONVERTING);
       finish_expr_stmt (build_modify_expr (exp, INIT_EXPR, init));
+
+      if (EMIT_LLVM) {
+        tree tmp, getexcall;
+        tree fn = get_identifier ("__llvm_cxxeh_get_last_caught");
+        if (IDENTIFIER_GLOBAL_VALUE (fn))
+          fn = IDENTIFIER_GLOBAL_VALUE (fn);
+        else {
+          /* Declare void* __llvm_... ().  */
+          fn = push_library_fn (fn, build_function_type (ptr_type_node,
+                                                         void_list_node));
+        }
+
+        getexcall = build_function_call (fn, NULL_TREE);
+        tmp = create_temporary_var (ptr_type_node);
+        DECL_REGISTER (tmp) = 1;
+        cp_finish_decl (tmp, getexcall, NULL_TREE, LOOKUP_ONLYCONVERTING);
+        finish_expr_stmt (build_modify_expr (tmp, INIT_EXPR, getexcall));
+        ExceptionCaught = tmp;
+      }
     }
   else
-    finish_expr_stmt (do_begin_catch ());
+    {
+      if (EMIT_LLVM) {
+        /* A catch(...) statement should just call __llvm_cxxeh_begin_catch */
+        tree fn = get_identifier ("__llvm_cxxeh_begin_catch");
+        tree tmp, init;
+
+        if (IDENTIFIER_GLOBAL_VALUE (fn))
+          fn = IDENTIFIER_GLOBAL_VALUE (fn);
+        else
+          {
+            /* Declare void* __llvm_cxxeh_begin_catch ().  */
+            fn = push_library_fn (fn, build_function_type (ptr_type_node,
+                                                           void_list_node));
+          }
+
+        init = build_function_call (fn, NULL_TREE);
+
+        tmp = create_temporary_var (ptr_type_node);
+        DECL_REGISTER (tmp) = 1;
+        cp_finish_decl (tmp, init, NULL_TREE, LOOKUP_ONLYCONVERTING);
+        
+        finish_expr_stmt (build_modify_expr (tmp, INIT_EXPR, init));
+        ExceptionCaught = tmp;
+      } else {
+        finish_expr_stmt (do_begin_catch ());
+      }
+    }
 
   /* C++ requires that we call __cxa_end_catch at the end of
      processing the exception.  */
   if (! is_java)
-    push_eh_cleanup (type);
+    push_eh_cleanup (type, ExceptionCaught);
 
   if (decl)
     initialize_handler_parm (decl, exp);
@@ -497,7 +594,11 @@ do_allocate_exception (tree type)
 {
   tree fn;
 
-  fn = get_identifier ("__cxa_allocate_exception");
+  if (EMIT_LLVM)
+    fn = get_identifier("__llvm_cxxeh_allocate_exception");
+  else
+    fn = get_identifier ("__cxa_allocate_exception");
+
   if (IDENTIFIER_GLOBAL_VALUE (fn))
     fn = IDENTIFIER_GLOBAL_VALUE (fn);
   else
@@ -641,6 +742,9 @@ build_throw (tree exp)
   if (! doing_eh (1))
     return error_mark_node;
 
+  /* This function now throws! */
+  cp_function_chain->can_throw = 1;
+
   if (exp && decl_is_java_type (TREE_TYPE (exp), 1))
     {
       tree fn = get_identifier ("_Jv_Throw");
@@ -664,20 +768,24 @@ build_throw (tree exp)
       tree tmp;
       tree temp_expr, allocate_expr;
 
-      fn = get_identifier ("__cxa_throw");
+      if (EMIT_LLVM)
+        fn = get_identifier ("__llvm_cxxeh_throw");
+      else
+        fn = get_identifier ("__cxa_throw");
+
+      /* The CLEANUP_TYPE is the internal type of a destructor.  */
+      if (cleanup_type == NULL_TREE)
+        {
+          tmp = void_list_node;
+          tmp = tree_cons (NULL_TREE, ptr_type_node, tmp);
+          tmp = build_function_type (void_type_node, tmp);
+          cleanup_type = build_pointer_type (tmp);
+        }
+
       if (IDENTIFIER_GLOBAL_VALUE (fn))
 	fn = IDENTIFIER_GLOBAL_VALUE (fn);
       else
 	{
-	  /* The CLEANUP_TYPE is the internal type of a destructor.  */
-	  if (cleanup_type == NULL_TREE)
-	    {
-	      tmp = void_list_node;
-	      tmp = tree_cons (NULL_TREE, ptr_type_node, tmp);
-	      tmp = build_function_type (void_type_node, tmp);
-	      cleanup_type = build_pointer_type (tmp);
-	    }
-
 	  /* Declare void __cxa_throw (void*, void*, void (*)(void*)).  */
 	  /* ??? Second argument is supposed to be "std::type_info*".  */
 	  tmp = void_list_node;
@@ -685,7 +793,11 @@ build_throw (tree exp)
 	  tmp = tree_cons (NULL_TREE, ptr_type_node, tmp);
 	  tmp = tree_cons (NULL_TREE, ptr_type_node, tmp);
 	  tmp = build_function_type (void_type_node, tmp);
-	  fn = push_throw_library_fn (fn, tmp);
+
+          if (EMIT_LLVM) {
+            fn = push_library_fn (fn, tmp);   /* Does not throw!! */
+          } else
+            fn = push_throw_library_fn (fn, tmp);
 	}
 
       /* throw expression */
@@ -771,11 +883,21 @@ build_throw (tree exp)
     {
       /* Rethrow current exception.  */
 
-      tree fn = get_identifier ("__cxa_rethrow");
+      tree fn;
+      if (EMIT_LLVM)
+        fn = get_identifier ("__llvm_cxxeh_rethrow");
+      else
+        fn = get_identifier ("__cxa_rethrow");
+
       if (IDENTIFIER_GLOBAL_VALUE (fn))
 	fn = IDENTIFIER_GLOBAL_VALUE (fn);
       else
 	{
+          if (EMIT_LLVM) {  /* _llvm_cxxeh_rethrow doesn't actually throw */
+            fn = push_library_fn
+              (fn, build_function_type (void_type_node, void_list_node));
+          } else
+
 	  /* Declare void __cxa_rethrow (void).  */
 	  fn = push_throw_library_fn
 	    (fn, build_function_type (void_type_node, void_list_node));

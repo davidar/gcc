@@ -3836,6 +3836,11 @@ extern tree eh_type_info			(tree);
 extern rtx cxx_expand_expr			(tree, rtx,
 							 enum machine_mode,
 							 int);
+extern struct llvm_value* cxx_llvm_expand_expr	(struct llvm_function *, tree,
+                                                 struct llvm_value *);
+struct llvm_value* cxx_llvm_expand_lvalue_expr	(struct llvm_function *, tree,
+                                                 unsigned *, unsigned *);
+extern void cxx_llvm_expand_stmt		(struct llvm_function *, tree);
 extern tree cplus_expand_constant               (tree);
 
 /* friend.c */

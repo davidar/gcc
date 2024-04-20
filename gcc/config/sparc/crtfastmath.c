@@ -33,6 +33,8 @@
  */
 
 #define FPRS_NS		(1 << 22)	/* Non-Standard fpu results */
+#include "../../llvm-out.h"
+#if !EMIT_LLVM
 
 static void __attribute__((constructor))
 set_fast_math (void)
@@ -52,3 +54,4 @@ set_fast_math (void)
   __asm__("ld %0, %%fsr"
 	  : : "m" (fsr));
 }
+#endif

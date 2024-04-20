@@ -43,6 +43,8 @@
 #include "debug.h"
 #include "cgraph.h"
 
+#include "llvm-internals.h"
+
 /* There routines provide a modular interface to perform many parsing
    operations.  They may therefore be used during actual parsing, or
    during template instantiation, which may be regarded as a
@@ -59,8 +61,8 @@ static void genrtl_try_block (tree);
 static void genrtl_eh_spec_block (tree);
 static void genrtl_handler (tree);
 static void cp_expand_stmt (tree);
-static void genrtl_start_function (tree);
-static void genrtl_finish_function (tree);
+static struct llvm_function *genrtl_start_function (tree);
+static void genrtl_finish_function (struct llvm_function *, tree);
 static tree clear_decl_rtl (tree *, int *, void *);
 
 /* Finish processing the COND, the SUBSTMT condition for STMT.  */
@@ -2708,6 +2710,7 @@ cp_expand_stmt (tree t)
     }
 }
 
+
 /* Called from expand_body via walk_tree.  Replace all AGGR_INIT_EXPRs
    will equivalent CALL_EXPRs.  */
 
@@ -2858,7 +2861,10 @@ expand_body (tree fn)
 {
   location_t saved_loc;
   tree saved_function;
-  
+#if EMIT_LLVM
+  struct llvm_function *LLVMFn;
+#endif
+
   if (flag_unit_at_a_time && !cgraph_global_info_ready)
     abort ();
 
@@ -2891,11 +2897,19 @@ expand_body (tree fn)
   timevar_pop (TV_INTEGRATION);
   timevar_push (TV_EXPAND);
 
+#if EMIT_LLVM
+  LLVMFn =
+#endif
   genrtl_start_function (fn);
+
   current_function_is_thunk = DECL_THUNK_P (fn);
 
   /* Expand the body.  */
+#if EMIT_LLVM
+  llvm_expand_stmt(LLVMFn, DECL_SAVED_TREE (fn));
+#else
   expand_stmt (DECL_SAVED_TREE (fn));
+#endif
 
   /* Statements should always be full-expressions at the outermost set
      of curly braces for a function.  */
@@ -2906,7 +2920,11 @@ expand_body (tree fn)
   input_line = STMT_LINENO (DECL_SAVED_TREE (fn));
 
   /* Generate code for the function.  */
-  genrtl_finish_function (fn);
+  genrtl_finish_function (
+#if EMIT_LLVM
+			  LLVMFn,
+#endif
+			  fn);
 
   /* If possible, obliterate the body of the function so that it can
      be garbage collected.  */
@@ -3058,9 +3076,13 @@ nullify_returns_r (tree* tp, int* walk_subtrees, void* data)
 
 /* Start generating the RTL for FN.  */
 
-static void
+static struct llvm_function *
 genrtl_start_function (tree fn)
 {
+#if EMIT_LLVM
+  struct llvm_function *LLVMFn;
+#endif
+
   /* Tell everybody what function we're processing.  */
   current_function_decl = fn;
   /* Get the RTL machinery going for this function.  */
@@ -3106,6 +3128,23 @@ genrtl_start_function (tree fn)
   /* Keep track of how many functions we're presently expanding.  */
   ++function_depth;
 
+#if EMIT_LLVM
+  /* Create a binding level for the parameters.  */
+  LLVMFn = llvm_expand_function_start (fn, /*parms_have_cleanups=*/0);
+
+  /* If the named return value optimization has been applied to this function,
+   * set the LLVM value of the named returned value equal to the llvm of the
+   * DECL_RESULT.
+   */
+  if (current_function_return_value)
+    COPY_DECL_LLVM (DECL_RESULT (fn), current_function_return_value);
+
+  /* If this function is `main'.  */
+  if (DECL_MAIN_P (fn))
+    llvm_expand_main_function (LLVMFn);
+
+  return LLVMFn;
+#else
   /* Create a binding level for the parameters.  */
   expand_function_start (fn, /*parms_have_cleanups=*/0);
   /* If this function is `main'.  */
@@ -3115,16 +3154,17 @@ genrtl_start_function (tree fn)
   /* Give our named return value the same RTL as our RESULT_DECL.  */
   if (current_function_return_value)
     COPY_DECL_RTL (DECL_RESULT (fn), current_function_return_value);
+#endif
 }
 
 /* Finish generating the RTL for FN.  */
 
 static void
-genrtl_finish_function (tree fn)
+genrtl_finish_function (struct llvm_function *LLVMFn, tree fn)
 {
+#if 0
   tree t;
 
-#if 0
   if (write_symbols != NO_DEBUG)
     {
       /* Keep this code around in case we later want to control debug info
@@ -3161,8 +3201,12 @@ genrtl_finish_function (tree fn)
      zero.  */
   immediate_size_expand = 1;
 
-  /* Generate rtl for function exit.  */
-  expand_function_end ();
+  if (EMIT_LLVM) 
+    llvm_expand_function_end (LLVMFn, fn, 0);
+  else {
+    /* Generate rtl for function exit.  */
+    expand_function_end ();
+  }
 
   /* If this is a nested function (like a template instantiation that
      we're compiling in the midst of compiling something else), push a
@@ -3176,9 +3220,14 @@ genrtl_finish_function (tree fn)
      know we want to output it.  */
   DECL_DEFER_OUTPUT (fn) = 0;
 
+#if EMIT_LLVM
+  if (EMIT_CODE_INCREMENTALLY) llvm_function_print(LLVMFn, llvm_out_file);
+  cfun = 0;
+#else
   /* Run the optimizers and output the assembler code for this
      function.  */
   rest_of_compilation (fn);
+#endif
 
   /* Undo the call to ggc_push_context above.  */
   if (function_depth > 1)
@@ -3209,6 +3258,7 @@ genrtl_finish_function (tree fn)
   /* In C++, we should never be saving RTL for the function.  */
   my_friendly_assert (!DECL_SAVED_INSNS (fn), 20010903);
 
+#if !EMIT_LLVM
   /* Since we don't need the RTL for this function anymore, stop
      pointing to it.  That's especially important for LABEL_DECLs,
      since you can reach all the instructions in the function from the
@@ -3225,6 +3275,7 @@ genrtl_finish_function (tree fn)
       SET_DECL_RTL (t, NULL_RTX);
       DECL_INCOMING_RTL (t) = NULL_RTX;
     }
+#endif
 
   if (!(flag_inline_trees && DECL_INLINE (fn)))
     /* DECL_INITIAL must remain nonzero so we know this was an
@@ -3240,6 +3291,7 @@ genrtl_finish_function (tree fn)
 /* Clear out the DECL_RTL for the non-static variables in BLOCK and
    its sub-blocks.  */
 
+#if !EMIT_LLVM
 static tree
 clear_decl_rtl (tree* tp, 
                 int* walk_subtrees ATTRIBUTE_UNUSED , 
@@ -3250,6 +3302,7 @@ clear_decl_rtl (tree* tp,
     
   return NULL_TREE;
 }
+#endif
 
 /* Perform initialization related to this module.  */
 
@@ -3260,3 +3313,63 @@ init_cp_semantics (void)
 }
 
 #include "gt-cp-semantics.h"
+
+
+/*===----------------------------------------------------------------------===**
+                          ... LLVM Expansion Code ...
+ *===----------------------------------------------------------------------===*/
+
+/* Generate LLVM code for T, which is a TRY_BLOCK.  */
+
+static void genllvm_try_block(struct llvm_function *Fn, tree t) {
+  /* Start an EH region */
+  llvm_expand_eh_region_start(Fn);
+
+  /* Expand the potentially throwing body */
+  llvm_expand_stmt(Fn, TRY_STMTS (t));
+    
+  if (CLEANUP_P(t)) {
+    /* If CLEANUP_P holds of the TRY_BLOCK, then the TRY_HANDLERS will not be a
+       HANDLER node. Instead, it will be an expression that should be executed
+       if an exception is thrown in the try block. It must rethrow the exception
+       after executing that code. And, if an exception is thrown while the
+       expression is executing, terminate must be called. */
+    llvm_expand_eh_region_end_cleanup(Fn, TRY_HANDLERS (t));
+
+  } else {
+    /* try/catch block around an entire function or normal catch block */
+    llvm_expand_catch_block(Fn, TRY_HANDLERS(t));
+  }
+}
+
+
+void cxx_llvm_expand_stmt(struct llvm_function *Fn, tree t) {
+  switch (TREE_CODE(t)) {
+  case USING_STMT: break;  /* Completely ignore these, as RTL expansion does */
+  case EH_SPEC_BLOCK:
+    /* Start an EH region. */
+    llvm_expand_eh_region_start(Fn);
+
+    /* Expand the body of the function. */
+    llvm_expand_stmt(Fn, EH_SPEC_STMTS(t));
+
+    /* Expand the catch block which implements the exception specification. */
+    llvm_expand_eh_spec(Fn, EH_SPEC_RAISES(t));
+    break;
+
+  case TRY_BLOCK:
+    genllvm_try_block(Fn, t);
+    break;
+
+  case HANDLER:
+    fprintf(stderr,
+            "HANDLER nodes should only exist as children of TRY_BLOCKs!");
+    debug_tree(t);
+    abort();
+
+  default:
+    LLVM_TODO_TREE(t);
+  }
+}
+
+

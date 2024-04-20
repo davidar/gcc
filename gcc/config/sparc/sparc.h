@@ -729,6 +729,16 @@ extern struct sparc_cpu_select sparc_select[];
 #define LONG_DOUBLE_TYPE_SIZE 128
 #endif
 
+#if EMIT_LLVM
+#undef LONG_DOUBLE_TYPE_SIZE
+#undef MAX_LONG_DOUBLE_TYPE_SIZE
+#undef LIBGCC2_LONG_DOUBLE_TYPE_SIZE
+#define LONG_DOUBLE_TYPE_SIZE 64
+#define MAX_LONG_DOUBLE_TYPE_SIZE 64
+#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
+#endif
+
+
 /* Width in bits of a pointer.
    See also the macro `Pmode' defined below.  */
 #define POINTER_SIZE (TARGET_PTR64 ? 64 : 32)

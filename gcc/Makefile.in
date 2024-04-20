@@ -818,8 +818,17 @@ C_AND_OBJC_OBJS = attribs.o c-errors.o c-lex.o c-pragma.o c-decl.o c-typeck.o \
 # Language-specific object files for C.
 C_OBJS = c-parse.o c-lang.o c-pretty-print.o $(C_AND_OBJC_OBJS)
 
-# Language-independent object files.
+# LLVM Specific Object Files
+LLVM_OBJS = llvm-out.o llvm-expand.o llvm-representation.o llvm-types.o
+LLVM_Hs   = llvm-representation.h llvm-out.h llvm-internals.h llvm-ilist.h
 
+$(LLVM_OBJS) : $(TM_H) $(TREE_H)
+
+cp/semantics.o: llvm-out.h llvm-internals.h
+llvm-out.o    : llvm-out.h llvm-internals.h
+llvm-expand.o llvm-types.o llvm-representation.o : $(LLVM_Hs)
+
+# Language-independent object files.
 OBJS-common = \
  alias.o bb-reorder.o bitmap.o builtins.o caller-save.o calls.o	  	   \
  cfg.o cfganal.o cfgbuild.o cfgcleanup.o cfglayout.o cfgloop.o		   \
@@ -841,7 +850,7 @@ OBJS-common = \
  sibcall.o simplify-rtx.o sreal.o ssa.o ssa-ccp.o ssa-dce.o stmt.o	   \
  stor-layout.o stringpool.o timevar.o toplev.o tracer.o tree.o tree-dump.o \
  unroll.o varasm.o varray.o version.o vmsdbgout.o xcoffout.o		   \
- alloc-pool.o et-forest.o cfghooks.o bt-load.o pretty-print.o $(GGC) 
+ alloc-pool.o et-forest.o cfghooks.o bt-load.o pretty-print.o $(GGC) $(LLVM_OBJS)
 
 OBJS-md = $(out_object_file)
 OBJS-archive = $(EXTRA_OBJS) $(host_hook_obj) hashtable.o tree-inline.o	   \

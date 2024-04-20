@@ -26,6 +26,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "cpplib.h"
 #include "ggc.h"
 
+struct llvm_value;
+struct llvm_function;
+struct llvm_type;
+
 /* Usage of TREE_LANG_FLAG_?:
    0: COMPOUND_STMT_NO_SCOPE (in COMPOUND_STMT).
       TREE_NEGATED_INT (in INTEGER_CST).
@@ -1257,6 +1261,11 @@ extern tree finish_label_address_expr (tree);
 extern tree lookup_label (tree);
 
 extern rtx c_expand_expr (tree, rtx, enum machine_mode, int);
+
+extern struct llvm_value *c_llvm_expand_expr(struct llvm_function *, tree,
+                                             struct llvm_value*);
+extern struct llvm_value *c_llvm_expand_lvalue_expr(struct llvm_function*,tree,
+                                                    unsigned *, unsigned *);
 
 extern int c_safe_from_p (rtx, tree);
 

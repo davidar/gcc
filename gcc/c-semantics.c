@@ -44,6 +44,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "timevar.h"
 #include "predict.h"
 #include "tree-inline.h"
+#include "llvm-out.h"
 
 /* If non-NULL, the address of a language-specific function for
    expanding statements.  */
@@ -265,6 +266,8 @@ make_rtl_for_local_static (tree decl)
 void
 emit_local_var (tree decl)
 {
+  LLVM_SHOULD_NOT_CALL();
+
   /* Create RTL for this variable.  */
   if (!DECL_RTL_SET_P (decl))
     {

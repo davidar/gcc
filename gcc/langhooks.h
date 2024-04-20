@@ -24,6 +24,9 @@ Boston, MA 02111-1307, USA.  */
 /* This file should be #include-d after tree.h.  */
 
 struct diagnostic_context;
+struct llvm_value;
+struct llvm_function;
+struct llvm_type;
 
 /* A print hook for print_tree ().  */
 typedef void (*lang_print_tree_hook) (FILE *, tree, int indent);
@@ -258,6 +261,17 @@ struct lang_hooks
   /* Called by expand_expr for language-specific tree codes.
      Fourth argument is actually an enum expand_modifier.  */
   rtx (*expand_expr) (tree, rtx, enum machine_mode, int);
+
+  /* Called by llvm_expand_expr for language-specific tree codes. */
+  struct llvm_value *(*llvm_expand_expr)(struct llvm_function*, tree,
+                                         struct llvm_value*);
+
+  /* Called by llvm_expand_lvalue_expr for language-specific tree codes. */
+  struct llvm_value *(*llvm_expand_lvalue_expr)(struct llvm_function*, tree,
+                                                unsigned *, unsigned *);
+
+  /* Called by llvm_expand_stmt for language-specific tree codes. */
+  void (*llvm_expand_stmt) (struct llvm_function*, tree);
 
   /* Prepare expr to be an argument of a TRUTH_NOT_EXPR or other logical
      operation.

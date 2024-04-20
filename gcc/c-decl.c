@@ -55,6 +55,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"
 #include "langhooks-def.h"
 
+#include "llvm-out.h"
+
 /* In grokdeclarator, distinguish syntactic contexts of declarators.  */
 enum decl_context
 { NORMAL,			/* Ordinary declaration */
@@ -1280,6 +1282,7 @@ duplicate_decls (tree newdecl, tree olddecl, int different_binding_level,
 
       /* Keep the old rtl since we can safely use it.  */
       COPY_DECL_RTL (olddecl, newdecl);
+      COPY_DECL_LLVM(olddecl, newdecl);
 
       /* Merge the type qualifiers.  */
       if (TREE_READONLY (newdecl))
@@ -2354,12 +2357,15 @@ builtin_function (const char *name, tree type, int function_code,
   tree decl = build_decl (FUNCTION_DECL, get_identifier (name), type);
   DECL_EXTERNAL (decl) = 1;
   TREE_PUBLIC (decl) = 1;
-  if (library_name)
-    SET_DECL_ASSEMBLER_NAME (decl, get_identifier (library_name));
-  make_decl_rtl (decl, NULL);
-  pushdecl (decl);
   DECL_BUILT_IN_CLASS (decl) = class;
   DECL_FUNCTION_CODE (decl) = function_code;
+  if (library_name)
+    SET_DECL_ASSEMBLER_NAME (decl, get_identifier (library_name));
+  if (EMIT_LLVM)
+    llvm_make_decl_llvm(decl, NULL);
+  else
+    make_decl_rtl (decl, NULL);
+  pushdecl (decl);
 
   /* Warn if a function in the namespace for users
      is used without an occasion to consider it declared.  */
@@ -5666,7 +5672,10 @@ start_function (tree declspecs, tree declarator, tree attributes)
   pushlevel (0);
   declare_parm_level ();
 
-  make_decl_rtl (current_function_decl, NULL);
+  if (EMIT_LLVM)
+    llvm_make_decl_llvm (current_function_decl, NULL);
+  else
+    make_decl_rtl (current_function_decl, NULL);
 
   restype = TREE_TYPE (TREE_TYPE (current_function_decl));
   /* Promote the value to int before returning it.  */
@@ -6052,15 +6061,17 @@ store_parm_decls (void)
 	SAVE_EXPR_CONTEXT (TREE_VALUE (t)) = context;
     }
 
-  /* This function is being processed in whole-function mode.  */
-  cfun->x_whole_function_mode_p = 1;
-
-  /* Even though we're inside a function body, we still don't want to
-     call expand_expr to calculate the size of a variable-sized array.
-     We haven't necessarily assigned RTL to all variables yet, so it's
-     not safe to try to expand expressions involving them.  */
-  immediate_size_expand = 0;
-  cfun->x_dont_save_pending_sizes_p = 1;
+  if (!EMIT_LLVM) {
+    /* This function is being processed in whole-function mode.  */
+    cfun->x_whole_function_mode_p = 1;
+    
+    /* Even though we're inside a function body, we still don't want to
+       call expand_expr to calculate the size of a variable-sized array.
+       We haven't necessarily assigned RTL to all variables yet, so it's
+       not safe to try to expand expressions involving them.  */
+    immediate_size_expand = 0;
+    cfun->x_dont_save_pending_sizes_p = 1;
+  }
 }
 
 /* Finish up a function declaration and compile that function
@@ -6172,7 +6183,7 @@ finish_function (int nested, int can_defer_p)
 	  return;
 	}
 
-      if (flag_inline_trees)
+      if (flag_inline_trees && !EMIT_LLVM)
 	{
 	  /* First, cache whether the current function is inlinable.  Some
 	     predicates depend on cfun and current_function_decl to
@@ -6203,7 +6214,10 @@ finish_function (int nested, int can_defer_p)
 	  timevar_pop (TV_INTEGRATION);
 	}
 
-      c_expand_body (fndecl);
+      if (EMIT_LLVM)
+        llvm_c_expand_body (fndecl);
+      else
+        c_expand_body (fndecl);
 
       /* Keep the function body if it's needed for inlining or dumping.  */
       if (uninlinable && !dump_enabled_p (TDI_all))
@@ -6234,7 +6248,10 @@ c_expand_deferred_function (tree fndecl)
 	  optimize_inline_calls (fndecl);
 	  timevar_pop (TV_INTEGRATION);
 	}
-      c_expand_body (fndecl);
+      if (EMIT_LLVM)
+        llvm_c_expand_body (fndecl);
+      else
+        c_expand_body (fndecl);
       current_function_decl = NULL;
     }
 }
@@ -6415,6 +6432,7 @@ c_expand_body_1 (tree fndecl, int nested_p)
 void
 c_expand_body (tree fndecl)
 {
+  LLVM_SHOULD_NOT_CALL();
   c_expand_body_1 (fndecl, 0);
 }
 
