@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Utility routines for data type conversion for GCC.
    Copyright (C) 1987, 1988, 1991, 1992, 1993, 1994, 1995, 1997, 1998,
    2000, 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -387,6 +390,10 @@ convert_to_integer (tree type, tree expr)
       switch (fcode)
         {
 	CASE_FLT_FN (BUILT_IN_CEIL):
+#ifdef KEY /* bug 12569 */
+	  if (flag_spin_file)
+	    break;
+#endif
 	  /* Only convert in ISO C99 mode.  */
 	  if (!TARGET_C99_FUNCTIONS)
 	    break;
@@ -400,6 +407,10 @@ convert_to_integer (tree type, tree expr)
 	  break;
 
 	CASE_FLT_FN (BUILT_IN_FLOOR):
+#ifdef KEY /* bug 12569 */
+	  if (flag_spin_file)
+	    break;
+#endif
 	  /* Only convert in ISO C99 mode.  */
 	  if (!TARGET_C99_FUNCTIONS)
 	    break;
@@ -438,10 +449,12 @@ convert_to_integer (tree type, tree expr)
 	  break;
 
 	CASE_FLT_FN (BUILT_IN_TRUNC):
-	  {
-	    tree arglist = TREE_OPERAND (s_expr, 1);
-	    return convert_to_integer (type, TREE_VALUE (arglist));
-	  }
+	  if (!flag_spin_file)
+	    {
+	      tree arglist = TREE_OPERAND (s_expr, 1);
+	      return convert_to_integer (type, TREE_VALUE (arglist));
+	    }
+	  break;
 
 	default:
 	  break;

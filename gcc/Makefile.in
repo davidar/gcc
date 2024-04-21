@@ -1,6 +1,10 @@
 # Makefile for GNU Compiler Collection
 # Run 'configure' to generate Makefile from Makefile.in
 
+# Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
+
+# Copyright (C) 2006, 2007. QLogic Corporation. All Rights Reserved.
+
 # Copyright (C) 1987, 1988, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
 # 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
 # Free Software Foundation, Inc.
@@ -816,6 +820,7 @@ TREE_DATA_REF_H = tree-data-ref.h $(LAMBDA_H)
 VARRAY_H = varray.h $(MACHMODE_H) $(SYSTEM_H) coretypes.h $(TM_H)
 TREE_INLINE_H = tree-inline.h $(VARRAY_H) $(SPLAY_TREE_H)
 REAL_H = real.h $(MACHMODE_H)
+GSPIN_H = gspin-gcc-interface.h 
 
 #
 # Now figure out from those variables how to compile and link.
@@ -827,13 +832,21 @@ INTERNAL_CFLAGS = -DIN_GCC @CROSS@
 
 # This is the variable actually used when we compile. If you change this,
 # you probably want to update BUILD_CFLAGS in configure.ac
-ALL_CFLAGS = $(X_CFLAGS) $(T_CFLAGS) \
+ALL_CFLAGS = -DKEY -DOPEN64_SPIN -DFE_GNU_4_2_0 $(X_CFLAGS) $(T_CFLAGS) \
   $(CFLAGS) $(INTERNAL_CFLAGS) $(COVERAGE_FLAGS) $(WARN_CFLAGS) $(XCFLAGS) @DEFS@
+
+uname-s := $(shell uname -s)
+ifeq ($(uname-s),Darwin)
+ALL_CFLAGS += -DBUILD_OS_DARWIN
+endif
 
 # Likewise.  Put INCLUDES at the beginning: this way, if some autoconf macro
 # puts -I options in CPPFLAGS, our include files in the srcdir will always
 # win against random include files in /usr/include.
 ALL_CPPFLAGS = $(INCLUDES) $(CPPFLAGS) $(X_CPPFLAGS) $(T_CPPFLAGS)
+
+# Open64: Location of libgspin42.a, which must already be built.
+LIBGSPIN = $(build_objdir)/../../osprey/targdir/libspin_4_2_0/libgspin42.a
 
 # Build and host support libraries.
 LIBIBERTY = ../libiberty/libiberty.a
@@ -873,6 +886,7 @@ BUILD_ERRORS = build/errors.o
 # libintl.h will be found in ../intl if we are using the included libintl.
 INCLUDES = -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 	   -I$(srcdir)/../include @INCINTL@ \
+	   -I$(srcdir)/../../libspin \
 	   $(CPPINC) $(GMPINC) $(DECNUMINC)
 
 .c.o:
@@ -1032,7 +1046,7 @@ OBJS = $(OBJS-common) $(out_object_file) $(OBJS-archive)
 
 OBJS-onestep = libbackend.o $(OBJS-archive)
 
-BACKEND = main.o @TREEBROWSER@ libbackend.a $(CPPLIB) $(LIBDECNUMBER)
+BACKEND = main.o @TREEBROWSER@ libbackend.a $(LIBGSPIN) $(CPPLIB) $(LIBDECNUMBER)
 
 # Files to be copied after each stage in building.
 STAGECOPYSTUFF = insn-flags.h insn-config.h insn-codes.h \
@@ -1272,17 +1286,31 @@ config.status: $(srcdir)/configure $(srcdir)/config.gcc
 # UNSORTED
 # --------
 
-all.internal: start.encap rest.encap doc
+#all.internal: start.encap rest.encap doc
+# For Open64 compiler, omit doc
+# For MIPS/SL compiler, omit rest.encap
+ifneq (, $(filter mips%, $(target)))
+all.internal: start.encap
+else
+    ifneq (, $(filter powerpc%, $(target)))
+    all.internal: start.encap
+    else
+    all.internal: start.encap rest.encap
+    endif
+endif
+
 # This is what to compile if making a cross-compiler.
 all.cross: native gcc-cross$(exeext) cpp$(exeext) specs \
 	$(LIBGCC) $(EXTRA_PARTS) lang.all.cross doc @GENINSRC@ srcextra
 # This is what must be made before installing GCC and converting libraries.
-start.encap: native xgcc$(exeext) cpp$(exeext) specs \
+start.encap: native xgcc$(exeext) cpp$(exeext) specs\
 	xlimits.h lang.start.encap @GENINSRC@ srcextra
+# KEY: disable build of libraries.
 # These can't be made until after GCC can run.
 rest.encap: $(STMP_FIXPROTO) $(LIBGCC) $(EXTRA_PARTS) lang.rest.encap
 # This is what is made with the host's compiler
 # whether making a cross compiler or not.
+
 native: config.status auto-host.h build-@POSUB@ $(LANGUAGES) \
 	$(EXTRA_PASSES) $(EXTRA_PROGRAMS) $(COLLECT2)
 
@@ -1820,7 +1848,8 @@ tree.o : tree.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(TREE_H) \
    $(FLAGS_H) $(FUNCTION_H) $(PARAMS_H) \
    toplev.h $(GGC_H) $(HASHTAB_H) $(TARGET_H) output.h $(TM_P_H) langhooks.h \
    $(REAL_H) gt-tree.h tree-iterator.h $(BASIC_BLOCK_H) $(TREE_FLOW_H) \
-   $(OBSTACK_H) pointer-set.h
+   $(OBSTACK_H) pointer-set.h \
+   $(GSPIN_H)
 tree-dump.o: tree-dump.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
    $(TREE_H) langhooks.h toplev.h $(SPLAY_TREE_H) $(TREE_DUMP_H) \
    tree-iterator.h tree-pass.h $(DIAGNOSTIC_H) $(REAL_H)
@@ -2190,7 +2219,7 @@ varasm.o : varasm.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(TREE_H) \
    $(RTL_H) $(FLAGS_H) $(FUNCTION_H) $(EXPR_H) hard-reg-set.h $(REGS_H) \
    output.h $(C_PRAGMA_H) toplev.h xcoffout.h debug.h $(GGC_H) $(TM_P_H) \
    $(HASHTAB_H) $(TARGET_H) langhooks.h gt-varasm.h $(BASIC_BLOCK_H) \
-   $(CFGLAYOUT_H) $(CGRAPH_H) tree-mudflap.h $(REAL_H)
+   $(CFGLAYOUT_H) $(CGRAPH_H) tree-mudflap.h $(REAL_H) $(GSPIN_H)
 function.o : function.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(TREE_H) $(CFGLAYOUT_H) $(TREE_GIMPLE_H) $(FLAGS_H) $(FUNCTION_H) $(EXPR_H) \
    $(OPTABS_H) libfuncs.h $(REGS_H) hard-reg-set.h insn-config.h $(RECOG_H) \
@@ -3682,6 +3711,7 @@ installdirs:
 	$(mkinstalldirs) $(DESTDIR)$(man7dir)
 
 # Install the compiler executables built during cross compilation.
+ifeq (, $(filter powerpc%, $(target))) 
 install-common: native $(EXTRA_PARTS) lang.install-common installdirs
 	for file in $(COMPILERS); do \
 	  if [ -f $$file ] ; then \
@@ -3725,7 +3755,44 @@ install-common: native $(EXTRA_PARTS) lang.install-common installdirs
 	    $(INSTALL_PROGRAM) gcov$(exeext) $(DESTDIR)$(bindir)/$(GCOV_INSTALL_NAME)$(exeext); \
 	fi
 	$(INSTALL_SCRIPT) gccbug $(DESTDIR)$(bindir)/$(GCCBUG_INSTALL_NAME)
-
+else
+install-common: native lang.install-common installdirs
+	for file in $(COMPILERS); do \
+	  if [ -f $$file ] ; then \
+	    rm -f $(DESTDIR)$(libexecsubdir)/$$file; \
+	    $(INSTALL_PROGRAM) $$file $(DESTDIR)$(libexecsubdir)/$$file; \
+	  else true; \
+	  fi; \
+	done
+	for file in $(EXTRA_PASSES) $(EXTRA_PROGRAMS) $(COLLECT2) ..; do \
+	  if [ x"$$file" != x.. ]; then \
+	    rm -f $(DESTDIR)$(libexecsubdir)/$$file; \
+	    $(INSTALL_PROGRAM) $$file $(DESTDIR)$(libexecsubdir)/$$file; \
+	  else true; fi; \
+	done
+# We no longer install the specs file because its presence makes the
+# driver slower, and because people who need it can recreate it by
+# using -dumpspecs.  We remove any old version because it would
+# otherwise override the specs built into the driver.
+	rm -f $(DESTDIR)$(libsubdir)/specs
+# Install protoize if it was compiled.
+	-if [ -f protoize$(exeext) ]; then \
+	  rm -f $(DESTDIR)$(bindir)/$(PROTOIZE_INSTALL_NAME)$(exeext); \
+	  $(INSTALL_PROGRAM) protoize$(exeext) $(DESTDIR)$(bindir)/$(PROTOIZE_INSTALL_NAME)$(exeext); \
+	  rm -f $(DESTDIR)$(bindir)/$(UNPROTOIZE_INSTALL_NAME)$(exeext); \
+	  $(INSTALL_PROGRAM) unprotoize$(exeext) $(DESTDIR)$(bindir)/$(UNPROTOIZE_INSTALL_NAME)$(exeext); \
+	  rm -f $(DESTDIR)$(libsubdir)/SYSCALLS.c.X; \
+	  $(INSTALL_DATA) SYSCALLS.c.X $(DESTDIR)$(libsubdir)/SYSCALLS.c.X; \
+	  chmod a-x $(DESTDIR)$(libsubdir)/SYSCALLS.c.X; \
+	fi
+# Install gcov if it was compiled.
+	-if [ -f gcov$(exeext) ]; \
+	then \
+	    rm -f $(DESTDIR)$(bindir)/$(GCOV_INSTALL_NAME)$(exeext); \
+	    $(INSTALL_PROGRAM) gcov$(exeext) $(DESTDIR)$(bindir)/$(GCOV_INSTALL_NAME)$(exeext); \
+	fi
+	$(INSTALL_SCRIPT) gccbug $(DESTDIR)$(bindir)/$(GCCBUG_INSTALL_NAME)
+endif
 # Install the driver program as $(target_noncanonical)-gcc,
 # $(target_noncanonical)-gcc-$(version)
 # and also as either gcc (if native) or $(gcc_tooldir)/bin/gcc.
@@ -4766,3 +4833,4 @@ po/gcc.pot: force
 	$(MAKE) srcextra
 	AWK=$(AWK) $(SHELL) $(srcdir)/po/exgettext \
 		$(XGETTEXT) gcc $(srcdir)
+

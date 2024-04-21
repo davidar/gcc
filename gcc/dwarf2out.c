@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Output Dwarf2 format symbol table information from GCC.
    Copyright (C) 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
    2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -10005,9 +10008,13 @@ reference_to_unused (tree * tp, int * walk_subtrees,
     return *tp;
   else if (!flag_unit_at_a_time)
     return NULL_TREE;
+  /* ???  The C++ FE emits debug information for using decls, so
+  putting gcc_unreachable here falls over.  See PR31899.  For now
+  be conservative.  */
   else if (!cgraph_global_info_ready
 	   && (TREE_CODE (*tp) == VAR_DECL || TREE_CODE (*tp) == FUNCTION_DECL))
-    gcc_unreachable ();
+    /*gcc_unreachable ();*/
+    return *tp;
   else if (DECL_P (*tp) && TREE_CODE (*tp) == VAR_DECL)
     {
       struct cgraph_varpool_node *node = cgraph_varpool_node (*tp);
@@ -11750,10 +11757,20 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
       if (DECL_ARTIFICIAL (decl))
 	add_AT_flag (subr_die, DW_AT_artificial, 1);
 
-      if (TREE_PROTECTED (decl))
+      if (TREE_PROTECTED (decl)) {
 	add_AT_unsigned (subr_die, DW_AT_accessibility, DW_ACCESS_protected);
-      else if (TREE_PRIVATE (decl))
+#ifdef KEY
+	if (flag_spin_file)
+	  DWARF_ACCESS(decl) = DW_ACCESS_protected;
+#endif
+      }
+      else if (TREE_PRIVATE (decl)) {
 	add_AT_unsigned (subr_die, DW_AT_accessibility, DW_ACCESS_private);
+#ifdef KEY
+	if (flag_spin_file)
+	  DWARF_ACCESS(decl) = DW_ACCESS_private;
+#endif
+      }
     }
 
   if (declaration)
@@ -12039,10 +12056,20 @@ gen_variable_die (tree decl, dw_die_ref context_die)
       if (DECL_ARTIFICIAL (decl))
 	add_AT_flag (var_die, DW_AT_artificial, 1);
 
-      if (TREE_PROTECTED (decl))
+      if (TREE_PROTECTED (decl)) {
 	add_AT_unsigned (var_die, DW_AT_accessibility, DW_ACCESS_protected);
-      else if (TREE_PRIVATE (decl))
+#ifdef KEY
+	if (flag_spin_file)
+	  DWARF_ACCESS(decl) = DW_ACCESS_protected;
+#endif
+      }
+      else if (TREE_PRIVATE (decl)) {
 	add_AT_unsigned (var_die, DW_AT_accessibility, DW_ACCESS_private);
+#ifdef KEY
+	if (flag_spin_file)
+	  DWARF_ACCESS(decl) = DW_ACCESS_private;
+#endif
+      }
     }
 
   if (declaration)
@@ -12232,10 +12259,20 @@ gen_field_die (tree decl, dw_die_ref context_die)
   if (DECL_ARTIFICIAL (decl))
     add_AT_flag (decl_die, DW_AT_artificial, 1);
 
-  if (TREE_PROTECTED (decl))
+  if (TREE_PROTECTED (decl)) {
     add_AT_unsigned (decl_die, DW_AT_accessibility, DW_ACCESS_protected);
-  else if (TREE_PRIVATE (decl))
+#ifdef KEY
+    if (flag_spin_file)
+      DWARF_ACCESS(decl) = DW_ACCESS_protected;
+#endif
+  }
+  else if (TREE_PRIVATE (decl)) {
     add_AT_unsigned (decl_die, DW_AT_accessibility, DW_ACCESS_private);
+#ifdef KEY
+    if (flag_spin_file)
+      DWARF_ACCESS(decl) = DW_ACCESS_private;
+#endif
+  }
 
   /* Equate decl number to die, so that we can look up this decl later on.  */
   equate_decl_number_to_die (decl, decl_die);
@@ -12361,10 +12398,20 @@ gen_inheritance_die (tree binfo, tree access, dw_die_ref context_die)
   if (BINFO_VIRTUAL_P (binfo))
     add_AT_unsigned (die, DW_AT_virtuality, DW_VIRTUALITY_virtual);
 
-  if (access == access_public_node)
+  if (access == access_public_node) {
     add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_public);
-  else if (access == access_protected_node)
+#ifdef KEY
+    if (flag_spin_file)
+      DWARF_ACCESS(binfo) = DW_ACCESS_public;
+#endif
+  }
+  else if (access == access_protected_node) {
     add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_protected);
+#ifdef KEY
+    if (flag_spin_file)
+      DWARF_ACCESS(binfo) = DW_ACCESS_protected;
+#endif
+  }
 }
 
 /* Generate a DIE for a class member.  */

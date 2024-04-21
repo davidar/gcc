@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Language-dependent node constructors for parse phase of GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
@@ -2064,7 +2068,12 @@ cp_cannot_inline_tree_fn (tree* fnp)
     }
 
   if (flag_really_no_inline
-      && lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL)
+      && (
+#ifdef KEY
+    /* Bug 11730: Disable inlining of always_inline functions in GNU fe. */
+          flag_spin_file ||
+#endif
+          lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL))
     return 1;
 
   /* Don't auto-inline functions that might be replaced at link-time

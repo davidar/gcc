@@ -1,3 +1,14 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
+/*
+ * Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Separate lexical analyzer for GNU C++.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
@@ -37,6 +48,9 @@ Boston, MA 02110-1301, USA.  */
 #include "output.h"
 #include "tm_p.h"
 #include "timevar.h"
+#ifdef KEY
+#include "gspin-gcc-interface.h"
+#endif
 
 static int interface_strcmp (const char *);
 static void init_cp_pragma (void);
@@ -176,6 +190,8 @@ struct resword
 #define D_EXT		0x01	/* GCC extension */
 #define D_ASM		0x02	/* in C99, but has a switch to turn it off */
 #define D_OBJC		0x04	/* Objective C++ only */
+#define D_KEIL		0x08    /* Keil compiler only */
+#define D_IAR           0x10    /* IAR compiler only */
 
 CONSTRAINT(ridbits_fit, RID_LAST_MODIFIER < sizeof(unsigned long) * CHAR_BIT);
 
@@ -190,6 +206,7 @@ static const struct resword reswords[] =
   { "__asm__",		RID_ASM,	0 },
   { "__attribute",	RID_ATTRIBUTE,	0 },
   { "__attribute__",	RID_ATTRIBUTE,	0 },
+  { "__declspec",	RID_ATTRIBUTE,	0 },
   { "__builtin_offsetof", RID_OFFSETOF, 0 },
   { "__builtin_va_arg",	RID_VA_ARG,	0 },
   { "__complex",	RID_COMPLEX,	0 },
@@ -280,6 +297,58 @@ static const struct resword reswords[] =
   { "wchar_t",		RID_WCHAR,	0 },
   { "while",		RID_WHILE,	0 },
 
+  /* These are KEIL compiler specific keywords */
+  { "__ALIGNOF__",	RID_ALIGNOF,	D_KEIL },
+  { "__INTADDR__",	RID_INTADDR,	D_KEIL },
+  { "__align",		RID_ALIGN,	D_KEIL },
+  { "__forceinline",	RID_INLINE,	D_KEIL },
+  { "__global_reg",	RID_GLOBAL_REG,	D_KEIL },
+  { "__int64",		RID_INT64,	D_KEIL },
+  { "__irq",		RID_IRQ,	D_KEIL },
+  { "__packed", 	RID_PACKED,	D_KEIL },
+  { "__pure",		RID_PURE,	D_KEIL },
+  { "__smc",		RID_SMC,	D_KEIL },
+  { "__softfp", 	RID_SOFTFP,	D_KEIL },
+  { "__svc",		RID_SVC,	D_KEIL },
+  { "__svc_indirect",	RID_SVC,	D_KEIL },
+  { "__svc_indirect_r7", RID_SVC,	D_KEIL },
+  { "__value_in_regs",	RID_VALUE_IN_REGS,D_KEIL},
+  { "__weak",		RID_WEAK,	D_KEIL },
+  { "__writeonly",	RID_WRITEONLY,	D_KEIL },
+
+  /* These are IAR extension keyworks */
+  { "__INTADDR__",	RID_INTADDR,	D_IAR },
+  { "__arm",            RID_ARM,        D_IAR },
+  { "__cmse_nonsecure_call", RID_NONSECURE_CALL, D_IAR },
+  { "__cmse_nonsecure_entry", RID_NONSECURE_ENTRY, D_IAR },
+  { "__code24",         RID_CODE24,     D_IAR },
+  { "__code32",         RID_CODE32,     D_IAR },
+  { "__constrange",     RID_CONSTRANGE, D_IAR },
+  { "__data16",         RID_DATA16,     D_IAR },
+  { "__data24",         RID_DATA24,     D_IAR },
+  { "__data32",         RID_DATA32,     D_IAR },
+  { "__fast_interrupt", RID_INTERRUPT,  D_IAR },
+  { "__interrupt",      RID_INTERRUPT,  D_IAR },
+  { "__interwork",      RID_INTERWORK,  D_IAR },
+  { "__intrinsic",      RID_INTRINSIC,  D_IAR },
+  { "__monitor",        RID_MONITOR,    D_IAR },
+  { "__no_init",        RID_NO_INIT,    D_IAR },
+  { "__noreturn",       RID_NORETURN,   D_IAR },
+  { "__nounwind",       RID_NOUNWIND,   D_IAR },
+  { "__packed",         RID_PACKED,     D_IAR },
+  { "__ramfunc",        RID_RAMFUNC,    D_IAR },
+  { "__root",           RID_ROOT,       D_IAR },
+  { "__sbdata16",       RID_SBDATA16,   D_IAR },
+  { "__sbdata24",       RID_SBDATA24,   D_IAR },
+  { "__sfb",            RID_SFB,        D_IAR },
+  { "__sfe",            RID_SFE,        D_IAR },
+  { "__section_end",    RID_SFE,        D_IAR },
+  { "__spec_string",    RID_SPEC_STRING,D_IAR },
+  { "__swi",            RID_SWI,        D_IAR },
+  { "__task",           RID_TASK,       D_IAR },
+  { "__thumb",          RID_THUMB,      D_IAR },
+  { "__weak",		RID_WEAK,	D_IAR },
+
   /* The remaining keywords are specific to Objective-C++.  NB:
      All of them will remain _disabled_, since they are context-
      sensitive.  */
@@ -315,6 +384,14 @@ init_reswords (void)
   int mask = ((flag_no_asm ? D_ASM : 0)
 	      | D_OBJC
 	      | (flag_no_gnu_keywords ? D_EXT : 0));
+
+  /* disable KEIL extension keywords if -fkeil is not specified */
+  if (!flag_keil_compat)
+    mask |= D_KEIL;
+
+  /* disable IAR extension keywords if -fiar is not specified */
+  if (!flag_iar_compat)
+    mask |= D_IAR;
 
   ridpointers = GGC_CNEWVEC (tree, (int) RID_MAX);
   for (i = 0; i < ARRAY_SIZE (reswords); i++)
@@ -518,6 +595,11 @@ handle_pragma_interface (cpp_reader* dfile ATTRIBUTE_UNUSED )
      a definition in another file.  */
   if (!MULTIPLE_SYMBOL_SPACES || !finfo->interface_only)
     finfo->interface_unknown = 0;
+
+#ifdef KEY
+  if (flag_spin_file)
+    gs_set_program_flag_value (GS_PRAGMA_INTERFACE, 1);
+#endif
 }
 
 /* Note that we have seen a #pragma implementation for the key MAIN_FILENAME.
@@ -575,6 +657,11 @@ handle_pragma_implementation (cpp_reader* dfile ATTRIBUTE_UNUSED )
       ifiles->next = impl_file_chain;
       impl_file_chain = ifiles;
     }
+
+#ifdef KEY
+  if (flag_spin_file)
+    gs_set_program_flag_value (GS_PRAGMA_IMPLEMENTATION, 1);
+#endif
 }
 
 /* Indicate that this file uses Java-personality exception handling.  */

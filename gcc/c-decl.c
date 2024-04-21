@@ -1,3 +1,11 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Process declarations and variables for C compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
    2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
@@ -520,6 +528,15 @@ bind (tree name, tree decl, struct c_scope *scope, bool invisible, bool nested)
     case PARM_DECL:
     case ERROR_MARK:     here = &I_SYMBOL_BINDING (name);  break;
 
+    /* IAR extension, allow COMPONENT_REF bind to symbol */
+    case COMPONENT_REF:
+      if (flag_iar_compat)
+        {
+          here = &I_SYMBOL_BINDING (name);
+          break;
+        }
+      /* fail through */
+
     default:
       gcc_unreachable ();
     }
@@ -862,6 +879,14 @@ pop_scope (void)
 		TREE_TYPE (b->shadowed->decl) = b->shadowed->type;
 	    }
 	  break;
+
+        case COMPONENT_REF:
+          /* IAR extensions for anonymous union */
+          if (flag_iar_compat)
+            {
+              break;
+            }
+          /* fall through */
 
 	default:
 	  gcc_unreachable ();
@@ -1282,12 +1307,20 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
      header.  (Conflicting redeclarations were handled above.)  */
   if (TREE_CODE (newdecl) == TYPE_DECL)
     {
-      if (DECL_IN_SYSTEM_HEADER (newdecl) || DECL_IN_SYSTEM_HEADER (olddecl))
+      if (DECL_IN_SYSTEM_HEADER (newdecl) ||
+          DECL_IN_SYSTEM_HEADER (olddecl) ||
+          TREE_NO_WARNING(newdecl) ||
+          TREE_NO_WARNING(olddecl))
 	return true;  /* Allow OLDDECL to continue in use.  */
 
-      error ("redefinition of typedef %q+D", newdecl);
-      locate_old_decl (olddecl, error);
-      return false;
+      if (variably_modified_type_p (newtype, NULL))
+        {
+          error ("redefinition of typedef %q+D", newdecl);
+          locate_old_decl (olddecl, error);
+          return false;
+        }
+
+      return true;
     }
 
   /* Function declarations can either be 'static' or 'extern' (no
@@ -3160,6 +3193,7 @@ start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
 {
   tree decl;
   tree tem;
+  struct c_scope *saved_scope;
 
   /* An object declared as __attribute__((deprecated)) suppresses
      warnings of uses of other deprecated items.  */
@@ -3299,9 +3333,21 @@ start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
     warning (OPT_Wattributes, "inline function %q+D given attribute noinline",
 	     decl);
 
+  /* IAR allows static function declared in function scope,
+     promote it to file scope */
+  saved_scope = current_scope;
+  if (flag_iar_compat
+      && TREE_CODE (decl) == FUNCTION_DECL
+      && declspecs->storage_class == csc_static)
+    current_scope = file_scope;
+
   /* Add this decl to the current scope.
      TEM may equal DECL or it may be a previous decl of the same name.  */
   tem = pushdecl (decl);
+
+  /* restore scope for IAR */
+  if (current_scope != saved_scope)
+    current_scope = saved_scope;
 
   if (initialized && DECL_EXTERNAL (tem))
     {
@@ -4722,7 +4768,9 @@ grokdeclarator (const struct c_declarator *declarator,
 		if (pedantic)
 		  pedwarn ("invalid storage class for function %qs", name);
 	      }
-	    else if (storage_class == csc_static)
+            /* IAR and KEIL allows static function declated in function scope */
+	    else if ((!flag_iar_compat && !flag_keil_compat)
+                     && storage_class == csc_static)
 	      {
 		error ("invalid storage class for function %qs", name);
 		if (funcdef_flag)
@@ -5548,7 +5596,9 @@ finish_struct (tree t, tree fieldlist, tree attributes)
 	  && flexible_array_type_p (TREE_TYPE (x)))
 	pedwarn ("%Jinvalid use of structure with flexible array member", x);
 
-      if (DECL_NAME (x))
+      if (DECL_NAME (x)
+          || TREE_CODE (TREE_TYPE (x)) == RECORD_TYPE
+          || TREE_CODE (TREE_TYPE (x)) == UNION_TYPE)
 	saw_named_field = 1;
     }
 
@@ -5787,7 +5837,12 @@ finish_enum (tree enumtype, tree values, tree attributes)
      as one of the integral types - the narrowest one that fits, except
      that normally we only go as narrow as int - and signed iff any of
      the values are negative.  */
-  unsign = (tree_int_cst_sgn (minnode) >= 0);
+
+  /* IAR prefer signed type than unsigned type */
+  if (flag_iar_compat)
+    unsign = 0;
+  else
+    unsign = (tree_int_cst_sgn (minnode) >= 0);
   precision = MAX (min_precision (minnode, unsign),
 		   min_precision (maxnode, unsign));
 
@@ -5796,8 +5851,22 @@ finish_enum (tree enumtype, tree values, tree attributes)
       tem = c_common_type_for_size (precision, unsign);
       if (tem == NULL)
 	{
-	  warning (0, "enumeration values exceed range of largest integer");
-	  tem = long_long_integer_type_node;
+#ifdef TARG_SL
+    if (Long_Long_Support == TRUE)
+    {
+      warning (0, "enumeration values exceed range of largest integer");
+      tem = long_long_integer_type_node;
+    }
+    else
+    {
+      error("\"long long\" is mapped to \"long\", "
+            "Please use \"-mlong-long\" option to enbale long long type suporting."
+            "enumeration values exceed range of largest integer");
+    }
+#else	
+  warning (0, "enumeration values exceed range of largest integer");
+  tem = long_long_integer_type_node;
+#endif
 	}
     }
   else
@@ -6403,6 +6472,29 @@ store_parm_decls_oldstyle (tree fndecl, const struct c_arg_info *arg_info)
       pointer_set_insert (seen_args, decl);
     }
 
+#ifdef TARG_SL
+  /* Don't support old-style function definition for float/double type */
+    tree parm_t;
+    int float_flag = 0;
+    for (parm_t = parmids; parm_t != NULL; parm_t = TREE_CHAIN(parm_t))
+    {
+        tree type_node = TYPE_MAIN_VARIANT(TREE_TYPE((I_SYMBOL_BINDING (TREE_VALUE (parm_t))->decl)));
+        if (type_node == float_type_node || type_node == double_type_node) 
+        {
+            float_flag = 1;
+            break;
+        }
+    }
+    if (float_flag == 1)
+    {
+       error("Old-style function definition is not supported for float/double type");
+    }
+    else
+    {
+       warning(0, "Old-style function definition");
+    }
+#endif
+
   /* Now examine the parms chain for incomplete declarations
      and declarations with no corresponding names.  */
 
@@ -6789,6 +6881,13 @@ finish_function (void)
   if (DECL_INITIAL (fndecl) && DECL_INITIAL (fndecl) != error_mark_node
       && !undef_nested_function)
     {
+#ifdef KEY
+	  /* Translate to spin before calling c_genericize, which lowers the
+	   * tree and destroys high-level program info useful for program
+	   * optimization. */
+	  if (flag_spin_file)
+	    gspin (fndecl);
+#endif
       if (!decl_function_context (fndecl))
 	{
 	  c_genericize (fndecl);
@@ -7165,6 +7264,7 @@ build_null_declspecs (void)
   ret->const_p = false;
   ret->volatile_p = false;
   ret->restrict_p = false;
+  ret->asm_p = false;
   return ret;
 }
 
@@ -7460,6 +7560,9 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 	    case RID_INT:
 	      specs->typespec_word = cts_int;
 	      return specs;
+	    case RID_INT64:
+	      specs->typespec_word = cts_int64;
+	      return specs;
 	    case RID_FLOAT:
 	      if (specs->long_p)
 		error ("both %<long%> and %<float%> in "
@@ -7476,6 +7579,8 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 	      else
 		specs->typespec_word = cts_float;
 	      return specs;
+            case RID_FLOAT128:
+              specs->long_p = 1;  // treat float128 as `long double'
 	    case RID_DOUBLE:
 	      if (specs->long_long_p)
 		error ("both %<long long%> and %<double%> in "
@@ -7765,9 +7870,29 @@ finish_declspecs (struct c_declspecs *specs)
       gcc_assert (!(specs->long_p && specs->short_p));
       gcc_assert (!(specs->signed_p && specs->unsigned_p));
       if (specs->long_long_p)
-	specs->type = (specs->unsigned_p
-		       ? long_long_unsigned_type_node
-		       : long_long_integer_type_node);
+      {
+#ifdef TARG_SL
+    if (Long_Long_Support == TRUE)
+    {
+      specs->type = (specs->unsigned_p
+           ? long_long_unsigned_type_node
+           : long_long_integer_type_node);
+    }
+    else
+    {
+      warning(0, "\"long long\" is mapped to \"long\", "
+              "Please use \"-mlong-long\" option to enbale long long type suporting");
+      specs->type = (specs->unsigned_p
+                         ? long_unsigned_type_node
+                         : long_integer_type_node);
+    }
+#else
+    specs->type = (specs->unsigned_p
+           ? long_long_unsigned_type_node
+           : long_long_integer_type_node);
+    
+#endif
+      }
       else if (specs->long_p)
 	specs->type = (specs->unsigned_p
 		       ? long_unsigned_type_node
@@ -7782,10 +7907,23 @@ finish_declspecs (struct c_declspecs *specs)
 		       : integer_type_node);
       if (specs->complex_p)
 	{
+#ifdef TARG_SL 
+      error("Unsupported type: \"complex\"");
+#endif
 	  if (pedantic)
 	    pedwarn ("ISO C does not support complex integer types");
 	  specs->type = build_complex_type (specs->type);
 	}
+      break;
+    case cts_int64:
+      if (specs->complex_p)
+        {
+          error ("Unsupported complex int64 types");
+        }
+      /* KEIL __int64 */
+      specs->type = (specs->unsigned_p
+                     ? unsigned_intDI_type_node
+                     : intDI_type_node);
       break;
     case cts_float:
       gcc_assert (!specs->long_p && !specs->short_p
@@ -7793,6 +7931,21 @@ finish_declspecs (struct c_declspecs *specs)
       specs->type = (specs->complex_p
 		     ? complex_float_type_node
 		     : float_type_node);
+	  
+#ifdef TARG_SL
+    if (TYPE_MAIN_VARIANT(specs->type) == float_type_node)
+		{
+		  if (Float_Point_Support == FALSE)
+      {    
+        error("\"float\" type is not supported in default mode, "
+              "Please use \"-msoft-float\" option to enable float point emulation");
+      }
+	  }
+    else
+    {
+        warning(0, "Unsupported type: \"complex float\"");
+    }
+#endif
       break;
     case cts_double:
       gcc_assert (!specs->long_long_p && !specs->short_p
@@ -7809,10 +7962,28 @@ finish_declspecs (struct c_declspecs *specs)
 			 ? complex_double_type_node
 			 : double_type_node);
 	}
+
+#ifdef TARG_SL
+    if (TYPE_MAIN_VARIANT(specs->type) == double_type_node)
+		{
+		  if (Float_Point_Support == FALSE)
+      {    
+        error("\"double\" type is not supported in default mode, "
+              "Please use \"-msoft-float\" option to enable float point emulation");
+      }
+	  }
+    else
+    {
+        warning(0, "Unsupported type: \"long double/complex\"");
+    }    
+#endif
       break;
     case cts_dfloat32:
     case cts_dfloat64:
     case cts_dfloat128:
+#ifdef TARG_SL 
+      error("Unsupported type: \"complex\"");
+#endif
       gcc_assert (!specs->long_p && !specs->long_long_p && !specs->short_p
 		  && !specs->signed_p && !specs->unsigned_p && !specs->complex_p);
       if (specs->typespec_word == cts_dfloat32)
@@ -7827,6 +7998,28 @@ finish_declspecs (struct c_declspecs *specs)
     }
 
   return specs;
+}
+
+/* Bind each field in anonymous union into current scope.
+   This is for IAR extension like
+   union {
+     int a;
+     int b;
+   };
+   a = b = 1;
+   needs create decl for anonymous in current scope and bind `a`
+   and `b' with component_ref */
+
+void
+iar_bind_anonymous_union(tree decl, tree type)
+{
+  tree memb, name, ref;
+  for (memb = TYPE_FIELDS (type); memb; memb = TREE_CHAIN (memb))
+    {
+      name = DECL_NAME (memb);
+      ref = build_component_ref(decl, name);
+      bind (name, ref, current_scope, false, false);
+    }
 }
 
 /* Synthesize a function which calls all the global ctors or global
@@ -7885,7 +8078,15 @@ c_write_global_declarations_1 (tree globals)
   while (reconsider);
 
   for (decl = globals; decl; decl = TREE_CHAIN (decl))
+  {
     check_global_declaration_1 (decl);
+#ifdef KEY
+    if (!DECL_IS_BUILTIN (decl)) {
+      if (flag_spin_file)
+        gspin (decl);
+    }
+#endif
+  }
 }
 
 /* A subroutine of c_write_global_declarations Emit debug information for each
@@ -7907,6 +8108,9 @@ void
 c_write_global_declarations (void)
 {
   tree t;
+#ifdef KEY
+  extern void remove_asm_file (void);
+#endif
 
   /* We don't want to do this if generating a PCH.  */
   if (pch_file)
@@ -7945,6 +8149,16 @@ c_write_global_declarations (void)
      functions have magic names which are detected by collect2.  */
   build_cdtor ('I', static_ctors); static_ctors = 0;
   build_cdtor ('D', static_dtors); static_dtors = 0;
+
+#ifdef KEY
+  if (flag_spin_file) {
+    remove_asm_file ();
+    if (!errorcount)
+      exit (EXIT_SUCCESS);
+    else
+      exit (2); /* Corresponding to RC_USER_ERROR as the ekopath driver expects. */
+  }
+#endif
 
   /* We're done parsing; proceed to optimize and emit assembly.
      FIXME: shouldn't be the front end's responsibility to call this.  */

@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Top-level control of tree optimizations.
    Copyright 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
@@ -365,6 +368,23 @@ tree_lowering_passes (tree fn)
 
   current_function_decl = fn;
   push_cfun (DECL_STRUCT_FUNCTION (fn));
+
+#ifdef KEY
+  /* This is the *only* point where we fully translate a FUNCTION_DECL for C++.
+   * Exception: C++ thunk functions are fully translated from use_thunk(). */
+  if (!strcmp("GNU C++", lang_hooks.name) &&
+      flag_spin_file &&
+      lang_hooks.cp_genericize /* C++ ? */) {
+    gs_x_func_decl(fn);
+    /* gimplify */
+    lang_hooks.cp_genericize(fn);
+    /* simplify AGGR_INIT_EXPR into CALL_EXPR. */
+    walk_tree_without_duplicates (&DECL_SAVED_TREE (fn),
+                                  lang_hooks.simplify_aggr_init_exprs_r,
+                                  NULL);
+  }
+#endif
+
   tree_register_cfg_hooks ();
   bitmap_obstack_initialize (NULL);
   execute_pass_list (all_lowering_passes);

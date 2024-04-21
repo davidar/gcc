@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Convert RTL to assembler code and output it, for GNU compiler.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997,
    1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
@@ -4067,10 +4070,23 @@ rest_of_clean_state (void)
   return 0;
 }
 
+#ifdef KEY
+static bool
+gate_rest_of_clean_state (void)
+{
+  /* Do nothing for libspin */
+  return flag_spin_file == 0;
+}
+#endif
+
 struct tree_opt_pass pass_clean_state =
 {
   NULL,                                 /* name */
+#ifdef KEY
+  gate_rest_of_clean_state,             /* gate */
+#else
   NULL,                                 /* gate */
+#endif
   rest_of_clean_state,                  /* execute */
   NULL,                                 /* sub */
   NULL,                                 /* next */

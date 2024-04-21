@@ -1,0 +1,5 @@
+/build-*
+/host-*
+/gmp*
+/mpc*
+/mpfr*

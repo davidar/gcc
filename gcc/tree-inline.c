@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Tree inlining.
    Copyright 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva <aoliva@redhat.com>
@@ -433,6 +436,16 @@ copy_statement_list (tree *tp)
   tree new;
 
   new = alloc_stmt_list ();
+
+#ifdef KEY
+  /* Bug 12821: For C++, preserve the tree type. (*tp) may have a
+     non-void type. In that case we may need that type so that
+     voidify_wrapper_expr() in gimplify.c functions properly. */
+  if (!strcmp ("GNU C++", lang_hooks.name) &&
+      flag_spin_file)
+    TREE_TYPE(new) = TREE_TYPE(*tp);
+#endif
+
   ni = tsi_start (new);
   oi = tsi_start (*tp);
   *tp = new;
@@ -644,7 +657,13 @@ copy_body_r (tree *tp, int *walk_subtrees, void *data)
 	    (NULL_TREE,
 	     id->eh_region_offset + TREE_INT_CST_LOW (TREE_OPERAND (*tp, 0)));
 
-      if (TREE_CODE (*tp) != OMP_CLAUSE)
+      if (TREE_CODE (*tp) != OMP_CLAUSE
+#ifdef KEY
+          /* Note that we have not yet run cp_genericize, hence *tp may be
+             a node whose TREE_TYPE is invalid. (bugs 12596, 12669) */
+          && (!flag_spin_file || (TREE_TYPE(*tp) && TYPE_P(TREE_TYPE(*tp))))
+#endif
+         )
 	TREE_TYPE (*tp) = remap_type (TREE_TYPE (*tp), id);
 
       /* The copied TARGET_EXPR has never been expanded, even if the
@@ -1835,6 +1854,15 @@ estimate_num_insns_1 (tree *tp, int *walk_subtrees, void *data)
       break;
 
     default:
+#ifdef KEY
+      /* We are delaying gimplification, so non-lowered tree codes will
+         show up here. GNU's inlining analysis does not affect us.
+         So return a dummy instruction cost of 1. */
+      if (flag_spin_file) {
+        *count += 1;
+        break;
+      }
+#endif
       gcc_unreachable ();
     }
   return NULL;
@@ -2000,6 +2028,7 @@ expand_call_inline (basic_block bb, tree stmt, tree *tp, void *data)
     {
       if (lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn))
 	  /* Avoid warnings during early inline pass. */
+	  && !DECL_IN_SYSTEM_HEADER (fn)
 	  && (!flag_unit_at_a_time || cgraph_global_info_ready))
 	{
 	  sorry ("inlining failed in call to %q+F: %s", fn, reason);

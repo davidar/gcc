@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Top level of GCC compilers (cc1, cc1plus, etc.)
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
@@ -100,6 +103,14 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 				   declarations for e.g. AIX 4.x.  */
 #endif
 
+#ifdef KEY
+#define RC_GCC_INTERNAL_ERROR   34
+extern void gspin_init (void);
+extern void gspin_init_global_trees_list (void);
+extern void gspin (tree t);
+extern void remove_asm_file (void);
+#endif
+
 static void general_init (const char *);
 static void do_compile (void);
 static void process_options (void);
@@ -117,6 +128,17 @@ static int print_single_switch (FILE *, int, int, const char *,
 				const char *, const char *);
 static void print_switch_values (FILE *, int, int, const char *,
 				 const char *, const char *);
+
+#ifdef TARG_SL
+/* Supporting long long type. -mlong-long */
+bool Long_Long_Support = FALSE;
+
+/* Supporting float point emulation. -msoft-float */
+bool Float_Point_Support = FALSE;
+#endif
+
+/* True if work for mastiff */
+bool for_mastiff = FALSE;
 
 /* Nonzero to dump debug info whilst parsing (-dy option).  */
 static int set_yydebug;
@@ -210,6 +232,13 @@ enum graph_dump_types graph_dump_format;
 /* Name for output file of assembly code, specified with -o.  */
 
 const char *asm_file_name;
+
+#ifdef KEY
+/* Name of the SPIN binary file. */
+const char *spin_file_name;
+
+int flag_spin_file;
+#endif
 
 /* Nonzero means do optimizations.  -O.
    Particular numeric values stand for particular amounts of optimization;
@@ -473,6 +502,19 @@ randomize (void)
       unsigned HOST_WIDE_INT value;
       static char random_seed[HOST_BITS_PER_WIDE_INT / 4 + 3];
 
+#ifdef KEY /* bugs 3099, 12015 */
+      {
+        size_t i;
+        value = 0;
+        if (dump_base_name) {
+          for (i = 0; i < strlen (dump_base_name); i++) {
+            value = (value << 1) ^ dump_base_name[i];
+          }
+        } else {
+          value = getpid ();
+        }
+      }
+#else
       /* Get some more or less random data.  */
 #ifdef HAVE_GETTIMEOFDAY
       {
@@ -490,6 +532,7 @@ randomize (void)
       }
 #endif
       value = local_tick ^ getpid ();
+#endif
 
       sprintf (random_seed, HOST_WIDE_INT_PRINT_HEX, value);
       flag_random_seed = random_seed;
@@ -599,6 +642,10 @@ crash_signal (int signo)
   if (this_is_asm_operands)
     {
       output_operand_lossage ("unrecoverable error");
+#ifdef KEY
+      fnotice (stderr, "GNU front-end error.\n");
+      exit (RC_GCC_INTERNAL_ERROR);
+#endif
       exit (FATAL_EXIT_CODE);
     }
 
@@ -1265,6 +1312,19 @@ print_switch_values (FILE *file, int pos, int max,
   fprintf (file, "%s", term);
 }
 
+#ifdef KEY
+/* Bug 10195: Do not produce a .s file under -spinfile. */
+void remove_asm_file (void) {
+
+  if (strcmp (asm_file_name, "-") != 0) {
+    if (fclose (asm_out_file) != 0)
+      fatal_error ("error closing %s: %m", asm_file_name);
+    if (unlink (asm_file_name) != 0)
+      fprintf (stderr, "unable to remove assembly file.\n");
+  }
+}
+#endif
+
 /* Open assembly code output file.  Do this even if -fsyntax-only is
    on, because then the driver will have provided the name of a
    temporary file or bit bucket for us.  NAME is the file specified on
@@ -1272,6 +1332,14 @@ print_switch_values (FILE *file, int pos, int max,
 static void
 init_asm_output (const char *name)
 {
+#ifdef KEY
+  if (flag_spin_file) {
+    asm_file_name = tempnam ("/tmp", "");
+    if (asm_file_name == NULL)
+      gcc_assert (0);
+  }
+#endif
+
   if (name == NULL && asm_file_name == 0)
     asm_out_file = stdout;
   else
@@ -1897,8 +1965,26 @@ lang_dependent_init (const char *name)
   input_filename = "<built-in>";
   input_line = 0;
 #endif
+
+#ifdef KEY
+  /* Set up the universe so that even if the source file is empty, we still
+   * emit a .spin file. */
+  if (flag_spin_file) {
+    gspin_init ();
+    gspin ((tree) NULL);
+  }
+#endif
+
   if (lang_hooks.init () == 0)
     return 0;
+
+#ifdef KEY
+  if (flag_spin_file) {
+    /* Add the global_trees after they are initialized. */
+    gspin_init_global_trees_list ();
+  }
+#endif
+
   input_location = save_loc;
 
   init_asm_output (name);
@@ -1949,6 +2035,11 @@ finalize (void)
      whether fclose returns an error, since the pages might still be on the
      buffer chain while the file is open.  */
 
+#ifdef KEY /* bug 11256 */
+  if (flag_spin_file)
+    remove_asm_file ();
+  else
+#endif
   if (asm_out_file)
     {
       if (ferror (asm_out_file) != 0)

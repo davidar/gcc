@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2010 Advanced Micro Devices, Inc.  All Rights Reserved.
+ */
+
 /* Build expressions with type checking for C compiler.
    Copyright (C) 1987, 1988, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
@@ -3032,6 +3036,7 @@ build_unary_op (enum tree_code code, tree xarg, int flag)
 	}
 
       /* For &x[y], return x+y */
+#ifndef OPEN64_SPIN
       if (TREE_CODE (arg) == ARRAY_REF)
 	{
 	  tree op0 = TREE_OPERAND (arg, 0);
@@ -3043,7 +3048,7 @@ build_unary_op (enum tree_code code, tree xarg, int flag)
 				   : op0),
 				  TREE_OPERAND (arg, 1), 1);
 	}
-
+#endif
       /* Anything not already handled and not a true memory reference
 	 or a non-lvalue array is an error.  */
       else if (typecode != FUNCTION_TYPE && !flag
@@ -3779,6 +3784,21 @@ build_modify_expr (tree lhs, enum tree_code modifycode, tree rhs)
   return convert_for_assignment (olhstype, result, ic_assign,
 				 NULL_TREE, NULL_TREE, 0);
 }
+
+#ifdef TARG_SL
+/* Get the innermost type of INNER_L 
+   And the innermost type of INNER_R in same point-level */
+
+static void get_inner_point_type(tree *inner_l, tree *inner_r)
+{
+  while ((TREE_CODE(*inner_l) == POINTER_TYPE || TREE_CODE(*inner_l) == REFERENCE_TYPE)
+      && (TREE_CODE(*inner_r) == POINTER_TYPE || TREE_CODE(*inner_r) == REFERENCE_TYPE))
+    {
+      *inner_l = TREE_TYPE(*inner_l);
+      *inner_r = TREE_TYPE(*inner_r);
+    }
+}
+#endif
 
 /* Convert value RHS to type TYPE as preparation for an assignment
    to an lvalue of type TYPE.
@@ -4060,6 +4080,11 @@ convert_for_assignment (tree type, tree rhs, enum impl_conv errtype,
       tree ttr = TREE_TYPE (rhstype);
       tree mvl = ttl;
       tree mvr = ttr;
+#ifdef TARG_SL
+      tree inner_l = type;
+      tree inner_r = rhstype;
+      get_inner_point_type(&inner_l, &inner_r);
+#endif
       bool is_opaque_pointer;
       int target_cmp = 0;   /* Cache comp_target_types () result.  */
 
@@ -4124,8 +4149,13 @@ convert_for_assignment (tree type, tree rhs, enum impl_conv errtype,
       if (VOID_TYPE_P (ttl) || VOID_TYPE_P (ttr)
 	  || (target_cmp = comp_target_types (type, rhstype))
 	  || is_opaque_pointer
+#ifdef TARG_SL
+	  || (c_common_unsigned_type (inner_l)
+	      == c_common_unsigned_type (inner_r)))
+#else
 	  || (c_common_unsigned_type (mvl)
 	      == c_common_unsigned_type (mvr)))
+#endif
 	{
 	  if (pedantic
 	      && ((VOID_TYPE_P (ttl) && TREE_CODE (ttr) == FUNCTION_TYPE)
@@ -4168,7 +4198,11 @@ convert_for_assignment (tree type, tree rhs, enum impl_conv errtype,
 		       || target_cmp)
 		;
 	      /* If there is a mismatch, do warn.  */
+#ifdef TARG_SL
+	      else if (warn_pointer_sign && (TYPE_UNSIGNED(inner_l) != TYPE_UNSIGNED(inner_r)))
+#else
 	      else if (warn_pointer_sign)
+#endif
 		WARN_FOR_ASSIGNMENT (G_("pointer targets in passing argument "
 					"%d of %qE differ in signedness"),
 				     G_("pointer targets in assignment "
@@ -7140,6 +7174,11 @@ c_start_case (tree exp)
 	    warning (OPT_Wtraditional, "%<long%> switch expression not "
 		     "converted to %<int%> in ISO C");
 
+#ifdef TARG_SL
+	    /* Verify sequence points for cond expr, Warning for undefined behaviors */
+	  if (warn_sequence_point)
+	    verify_sequence_points (exp);
+#endif
 	  exp = default_conversion (exp);
 	}
     }

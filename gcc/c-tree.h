@@ -1,3 +1,11 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Definitions for C parsing and type checking.
    Copyright (C) 1987, 1993, 1994, 1995, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
@@ -28,8 +36,15 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 
 /* struct lang_identifier is private to c-decl.c, but langhooks.c needs to
    know how big it is.  This is sanity-checked in c-decl.c.  */
+/* Bug 12755: On mips native, there is a extra four bytes (of alignment
+ * padding?) somewhere */
+#if defined(ARCH_MIPS) || defined(TARG_PPC)
+#define C_SIZEOF_STRUCT_LANG_IDENTIFIER \
+  (sizeof (struct c_common_identifier) + 3 * sizeof (void *) + 4)
+#else
 #define C_SIZEOF_STRUCT_LANG_IDENTIFIER \
   (sizeof (struct c_common_identifier) + 3 * sizeof (void *))
+#endif
 
 /* Language-specific declaration information.  */
 
@@ -210,6 +225,7 @@ enum c_typespec_keyword {
   cts_bool,
   cts_char,
   cts_int,
+  cts_int64,
   cts_float,
   cts_double,
   cts_dfloat32,
@@ -259,7 +275,7 @@ struct c_declspecs {
   BOOL_BITFIELD deprecated_p : 1;
   /* Whether the type defaulted to "int" because there were no type
      specifiers.  */
-  BOOL_BITFIELD default_int_p;
+  BOOL_BITFIELD default_int_p : 1;
   /* Whether "long" was specified.  */
   BOOL_BITFIELD long_p : 1;
   /* Whether "long" was specified more than once.  */
@@ -282,6 +298,8 @@ struct c_declspecs {
   BOOL_BITFIELD volatile_p : 1;
   /* Whether "restrict" was specified.  */
   BOOL_BITFIELD restrict_p : 1;
+  /* Whether "__asm" was specified */
+  BOOL_BITFIELD asm_p : 1;
 };
 
 /* The various kinds of declarators in C.  */
@@ -505,6 +523,9 @@ extern struct c_declspecs *declspecs_add_type (struct c_declspecs *,
 extern struct c_declspecs *declspecs_add_scspec (struct c_declspecs *, tree);
 extern struct c_declspecs *declspecs_add_attrs (struct c_declspecs *, tree);
 extern struct c_declspecs *finish_declspecs (struct c_declspecs *);
+
+/* IAR extension for anonymous union */
+extern void iar_bind_anonymous_union(tree, tree);
 
 /* in c-objc-common.c */
 extern int c_disregard_inline_limits (tree);

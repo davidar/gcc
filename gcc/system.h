@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Get common system includes and various definitions and declarations based
    on autoconf macros.
    Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005
@@ -602,9 +605,13 @@ extern void fancy_abort (const char *, int, const char *) ATTRIBUTE_NORETURN;
 # undef true
 # undef false
 
+#ifdef KEY
+#include <stdbool.h>    /* Sync with libspin and wgen. */
+#else
 # define bool unsigned char
 # define true 1
 # define false 0
+#endif
 
   /* Obsolete.  */
 # define TRUE true

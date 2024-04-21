@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Process declarations and variables for C++ compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005  Free Software Foundation, Inc.
@@ -51,6 +54,9 @@ Boston, MA 02110-1301, USA.  */
 #include "c-pragma.h"
 #include "tree-dump.h"
 #include "intl.h"
+#ifdef KEY
+#include "gspin-gcc-interface.h"
+#endif
 
 extern cpp_reader *parse_in;
 
@@ -1456,6 +1462,48 @@ decl_needed_p (tree decl)
      reference to DECL might cause it to be emitted later.  */
   return false;
 }
+
+#ifdef KEY
+/* Just like decl_needed_p but with TREE_SYMBOL_REFERENCED commented out.
+ *
+ * emit_tinfo_decl uses decl_maybe_needed_p instead of decl_needed_p.  We make
+ * the less strict test because it seems only typeinfos should come to
+ * emit_tinfo_decl for emission.  For some typeinfos, gcc sets
+ * TREE_SYMBOL_REFERENCED in its exception handling code, which we do not use.
+ * Hence this flag does not get set, and hence the typeinfo does not get
+ * initialized, giving link-time errors.
+ *
+ * In some cases, though, this may result in emission of tinfos even if they
+ * are REALLY not used/referenced.
+ *
+ * Ideally, we could have initialized these typeinfos in our front-end when
+ * they are used/referenced.  But that would require invoking several gcc
+ * functions, and then changing the already created ST entries. */
+bool
+decl_maybe_needed_p (tree decl)
+{
+  gcc_assert (TREE_CODE (decl) == VAR_DECL
+              || TREE_CODE (decl) == FUNCTION_DECL);
+  /* This function should only be called at the end of the translation
+     unit.  We cannot be sure of whether or not something will be
+     COMDAT until that point.  */
+  gcc_assert (at_eof);
+
+  /* All entities with external linkage that are not COMDAT should be
+     emitted; they may be referred to from other object files.  */
+  if (TREE_PUBLIC (decl) && !DECL_COMDAT (decl))
+    return true;
+  /* If this entity was used, let the back-end see it; it will decide
+     whether or not to emit it into the object file.  */
+  if (TREE_USED (decl)
+      || (DECL_ASSEMBLER_NAME_SET_P (decl)
+          /* && TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (decl)) */ ))
+      return true;
+  /* Otherwise, DECL does not need to be emitted -- yet.  A subsequent
+     reference to DECL might cause it to be emitted later.  */
+  return false;
+}
+#endif
 
 /* If necessary, write out the vtables for the dynamic class CTYPE.
    Returns true if any vtables were emitted.  */
@@ -3022,6 +3070,10 @@ build_java_method_aliases (void)
     }
 }
 
+#ifdef KEY
+extern int processing_global_namespace;
+#endif
+
 /* This routine is called from the last rule in yyparse ().
    Its job is to create all the code needed to initialize and
    destroy the global aggregates.  We do the destruction
@@ -3242,6 +3294,11 @@ cp_finish_file (void)
 	      && decl_needed_p (decl))
 	    DECL_EXTERNAL (decl) = 0;
 
+#ifdef KEY
+          if (flag_spin_file && gspin_invoked(decl))
+            gs_set_flag_value (decl, GS_DECL_EXTERNAL, DECL_EXTERNAL(decl));
+#endif
+
 	  /* If we're going to need to write this function out, and
 	     there's already a body for it, create RTL for it now.
 	     (There might be no body if this is a method we haven't
@@ -3263,6 +3320,12 @@ cp_finish_file (void)
 	      if (flag_syntax_only)
 		TREE_ASM_WRITTEN (decl) = 1;
 	      reconsider = true;
+#ifdef KEY
+              /* This function is emitted by g++.  Catches functions that are
+               * deferred by g++, such as those marked "inline". */
+              if (flag_spin_file)
+                gspin_gxx_emits_decl (decl);
+#endif
 	    }
 	}
 
@@ -3361,6 +3424,22 @@ cp_finish_file (void)
   build_java_method_aliases ();
 
   finish_repo ();
+
+#ifdef KEY
+  /* Now that we are done with the file, process the global namespace. */
+  if (flag_spin_file)
+  {
+    static int spun_global_namespace = 0;
+    if (!spun_global_namespace)
+    {
+      processing_global_namespace = 1;
+      gspin (global_namespace);
+      /* should already be reset in gspin */
+      processing_global_namespace = 0;
+      spun_global_namespace = 1;
+    }
+  }
+#endif
 
   /* The entire file is now complete.  If requested, dump everything
      to a file.  */

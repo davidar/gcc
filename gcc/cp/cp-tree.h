@@ -1,3 +1,10 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Definitions for C++ parsing and type checking.
    Copyright (C) 1987, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
    2000, 2001, 2002, 2003, 2004, 2005, 2006  Free Software Foundation, Inc.
@@ -1052,6 +1059,10 @@ struct lang_type_class GTY(())
   unsigned has_complex_assign_ref : 1;
   unsigned non_aggregate : 1;
 
+  /* KEY:  1 if the copy constructor is implicitly defined instead of user
+           defined. */
+  unsigned has_implicit_copy_constructor : 1;
+
   /* When adding a flag here, consider whether or not it ought to
      apply to a template instance if it applies to the template.  If
      so, make sure to copy it in instantiate_class_template!  */
@@ -1059,7 +1070,7 @@ struct lang_type_class GTY(())
   /* There are some bits left to fill out a 32-bit word.  Keep track
      of this by updating the size of this bitfield whenever you add or
      remove a flag.  */
-  unsigned dummy : 12;
+  unsigned dummy : 11;  /* KEY: 12 in original GCC */
 
   tree primary_base;
   VEC(tree_pair_s,gc) *vcall_indices;
@@ -1079,6 +1090,10 @@ struct lang_type_class GTY(())
      as a list of adopted protocols or a pointer to a corresponding
      @interface.  See objc/objc-act.h for details.  */
   tree objc_info;
+
+  /* KEY:  The copy constructor to use if the WHIRL translator needs to copy
+           objects. */
+  tree copy_constructor;
 };
 
 struct lang_type_ptrmem GTY(())
@@ -1602,6 +1617,11 @@ struct lang_decl GTY(())
 	  struct language_function * GTY ((tag ("1")))
 	       saved_language_function;
 	} GTY ((desc ("%1.u3sel + %1.pending_inline_p"))) u;
+
+         /* If the named return value optimization is applied to the function,
+            this is the VAR_DECL of the named return object. */
+        tree named_return_object;       /* KEY */
+
       } GTY ((tag ("1"))) f;
   } GTY ((desc ("%1.decl_flags.can_be_full"))) u;
 };
@@ -1722,6 +1742,11 @@ struct lang_decl GTY(())
      for (CLONE = TREE_CHAIN (FN);			\
 	  CLONE && DECL_CLONED_FUNCTION_P (CLONE);	\
 	  CLONE = TREE_CHAIN (CLONE))
+
+#ifdef KEY
+#define DECL_NAMED_RETURN_OBJECT(NODE) \
+  (DECL_LANG_SPECIFIC (NODE)->u.f.named_return_object)
+#endif
 
 /* Nonzero if NODE has DECL_DISCRIMINATOR and not DECL_ACCESS.  */
 #define DECL_DISCRIMINATOR_P(NODE)	\
@@ -2677,6 +2702,17 @@ extern void decl_shadowed_for_var_insert (tree, tree);
 /* Define fields and accessors for nodes representing declared names.  */
 
 #define TYPE_WAS_ANONYMOUS(NODE) (LANG_TYPE_CLASS_CHECK (NODE)->was_anonymous)
+
+#ifdef KEY
+/* Nonzero means this type's copy constructor is implicitly defined instead of
+   user defined. */
+#define TYPE_HAS_IMPLICIT_COPY_CONSTRUCTOR(NODE) \
+  (LANG_TYPE_CLASS_CHECK (NODE)->has_implicit_copy_constructor)
+
+/* The copy constructor to use if the front-end needs to copy objects. */
+#define CLASSTYPE_COPY_CONSTRUCTOR(NODE) \
+  (LANG_TYPE_CLASS_CHECK (NODE)->copy_constructor)
+#endif
 
 /* C++: all of these are overloaded!  These apply only to TYPE_DECLs.  */
 
@@ -3671,6 +3707,8 @@ typedef struct cp_decl_specifier_seq {
   BOOL_BITFIELD explicit_int_p : 1;
   /* True iff "char" was explicitly provided.  */
   BOOL_BITFIELD explicit_char_p : 1;
+  /* True iff '__asm' was explicitly provided. */
+  BOOL_BITFIELD asm_p : 1;
 } cp_decl_specifier_seq;
 
 /* The various kinds of declarators.  */
@@ -3999,6 +4037,9 @@ extern tree set_guard				(tree);
 extern tree cxx_callgraph_analyze_expr		(tree *, int *, tree);
 extern void mark_needed				(tree);
 extern bool decl_needed_p			(tree);
+#ifdef KEY
+extern bool decl_maybe_needed_p (tree);
+#endif
 extern void note_vague_linkage_fn		(tree);
 extern tree build_artificial_parm		(tree, tree);
 
@@ -4520,7 +4561,7 @@ extern tree merge_exception_specifiers		(tree, tree);
 
 /* in mangle.c */
 extern void init_mangle				(void);
-extern void mangle_decl				(tree);
+extern void mangle_decl				(const tree);
 extern const char *mangle_type_string		(tree);
 extern tree mangle_typeinfo_for_type		(tree);
 extern tree mangle_typeinfo_string_for_type	(tree);

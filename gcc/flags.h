@@ -96,6 +96,16 @@ extern int optimize_size;
 
 extern bool extra_warnings;
 
+#ifdef TARG_SL
+/* Supporting long long type. -mlong-long */
+
+extern bool Long_Long_Support;
+
+/* Supporting float point emulation. -msoft-float */
+
+extern bool Float_Point_Support;
+#endif
+
 /* Nonzero to warn about unused variables, functions et.al.  Use
    set_Wunused() to update the -Wunused-* flags that correspond to the
    -Wunused option.  */
@@ -260,6 +270,9 @@ extern bool flag_speculative_prefetching_set;
    to make it really random.  */
 
 extern const char *flag_random_seed;
+
+/* True if work for mastiff */
+extern bool for_mastiff;
 
 /* Returns TRUE if generated code should match ABI version N or
    greater is in use.  */
