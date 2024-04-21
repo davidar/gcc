@@ -3,6 +3,10 @@
  */
 
 /*
+ * Copyright (C) 2008. PathScale, LLC.  All rights reserved.
+ */
+
+/*
  * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
  */
 
@@ -1928,6 +1932,9 @@ static bool
 duplicate_decls (tree newdecl, tree olddecl)
 {
   tree newtype = NULL, oldtype = NULL;
+#ifdef KEY
+  unsigned int external = DECL_EXTERNAL (olddecl);
+#endif
 
   if (!diagnose_mismatched_decls (newdecl, olddecl, &newtype, &oldtype))
     {
@@ -1937,6 +1944,24 @@ duplicate_decls (tree newdecl, tree olddecl)
     }
 
   merge_decls (newdecl, olddecl, newtype, oldtype);
+
+#ifdef KEY
+  /* bug 14690: did we just reset the external flag on OLDDECL? */
+  if (TREE_CODE(olddecl) == FUNCTION_DECL &&
+      external &&
+      !DECL_EXTERNAL(olddecl) &&
+      gspin_invoked(olddecl))
+    {
+      /* reset external flag */
+      gs_set_flag_value (olddecl, GS_DECL_EXTERNAL, 0);
+      /* also update inline flags for "extern inline" scenarios */
+      gs_set_flag_value (olddecl, GS_DECL_INLINE,
+                         DECL_INLINE(olddecl));
+      gs_set_flag_value (olddecl, GS_DECL_DECLARED_INLINE_P,
+                         DECL_DECLARED_INLINE_P(olddecl));
+    }
+#endif
+
   return true;
 }
 
@@ -8152,6 +8177,10 @@ c_write_global_declarations (void)
 
 #ifdef KEY
   if (flag_spin_file) {
+    /* Bug 13913: above -O0, flag_unit_at_a_time causes a different
+       phase structure causing us to skip processing of global asm
+       statements. Output any such statements here. */
+    cgraph_output_pending_asms ();
     remove_asm_file ();
     if (!errorcount)
       exit (EXIT_SUCCESS);
