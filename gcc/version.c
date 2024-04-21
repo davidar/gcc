@@ -8,7 +8,13 @@
    in parentheses.  You may also wish to include a number indicating
    the revision of your modified compiler.  */
 
-#define VERSUFFIX ""
+/* BEGIN Path64 MODIFICATIONS */
+#define BASEVER "4.2.1"
+#define DATESTAMP ""
+#define DEVPHASE ""
+#define VERSUFFIX " (path64)"
+/* END Path64 MODIFICATIONS */
+
 
 /* This is the location of the online document giving instructions for
    reporting bugs.  If you distribute a modified version of GCC,

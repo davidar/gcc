@@ -469,7 +469,7 @@ struct lang_hooks
 
 #ifdef KEY
   tree (*cplus_expand_constant) (tree cst);
-  void (*mangle_decl) (const tree decl);
+  tree (*mangle_decl) (const tree decl);
   void (*cp_genericize) (tree fn);
   tree (*simplify_aggr_init_exprs_r) (tree *t, int *i, void *p);
 #endif

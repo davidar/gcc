@@ -74,7 +74,10 @@ Boston, MA 02110-1301, USA.  */
 #endif
 #include "prefix.h"
 
-static const char *std_prefix = PREFIX;
+/* BEGIN path64 MODIFICATIONS */
+#include <path64_prefix.h>
+static const char *std_prefix = GCC_TO_STRING(PREFIX);
+/* END path64 MODIFICATIONS */
 
 static const char *get_key_value (char *);
 static char *translate_name (char *);

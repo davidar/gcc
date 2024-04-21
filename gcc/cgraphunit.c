@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2008. PathScale, LLC.  All rights reserved.
+ */
+
 /* Callgraph based interprocedural optimizations.
    Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
@@ -171,6 +175,9 @@ static void cgraph_expand_all_functions (void);
 static void cgraph_mark_functions_to_output (void);
 static void cgraph_expand_function (struct cgraph_node *);
 static tree record_reference (tree *, int *, void *);
+#ifndef KEY
+static
+#endif
 void cgraph_output_pending_asms (void);
 static void cgraph_increase_alignment (void);
 
@@ -927,6 +934,9 @@ cgraph_varpool_output_debug_info (void)
 
 /* Output all asm statements we have stored up to be output.  */
 
+#ifndef KEY
+static
+#endif
 void
 cgraph_output_pending_asms (void)
 {
