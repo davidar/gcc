@@ -1,32 +1,23 @@
 /*
- *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ * Copyright (C) 2006. PathScale Inc. All Rights Reserved.
  */
 
 /*
- * Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
- */
 
-/*
-  Copyright (C) 2006. QLogic Corporation. All Rights Reserved.
+   Path64 is free software; you can redistribute it and/or modify it
+   under the terms of the GNU General Public License as published by
+   the Free Software Foundation version 3
 
-  This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2 of the GNU General Public License as
-  published by the Free Software Foundation.
+   Path64 is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+   License for more details.
 
-  This program is distributed in the hope that it would be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   You should have received a copy of the GNU General Public License
+   along with Path64; see the file COPYING.  If not, write to the Free
+   Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+   02110-1301, USA.
 
-  Further, this software is distributed without any warranty that it is
-  free of the rightful claim of any third person regarding infringement
-  or the like.  Any license provided herein, whether implied or
-  otherwise, applies only to this software file.  Patent licenses, if
-  any, provided herein do not apply to combinations of this program with
-  other software, or any other product whatsoever.
-
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write the Free Software Foundation, Inc., 59
-  Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
 #include <stdio.h>
@@ -36,7 +27,8 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
-
+#include <inttypes.h>
+#include <limits.h>
 #include "gspin-tree.h"
 #include "gspin-list.h"
 #include "gspin-tel.h"		// for gs_program
@@ -115,9 +107,9 @@ gs_void_t gs_write (const gs_string_t filename)
     p_in_memseg = (gs_t) (mem_seg + i);
     size = gspin_node_size(gs_code(t));
     memcpy(p_in_memseg, t, size);
+#if 0
 #ifdef Is_True_On
     _gs_em(p_in_memseg, false);
-#ifdef CHECK_SPIN_LEAKS
     if (gs_em(t) == false) {
       printf("leaked node: ");
       gs_dump(t);
@@ -155,9 +147,9 @@ gs_unsigned_char_t *gs_read (const gs_string_t filename)
 {
   gs_int_t fd, fstat_rv;
   struct stat statbuf;
-  char *p, *string_section;
+  char *p, *string_section, *maxptr;
  
-  fd = open (filename, O_RDONLY); 
+  fd = open (filename, O_RDWR); 
   GS_ASSERT (fd != -1, "open failed.\n");
   fstat_rv = fstat (fd, &statbuf);
   // printf ("statbuf.st_size: %ld\n", statbuf.st_size);
@@ -169,24 +161,27 @@ gs_unsigned_char_t *gs_read (const gs_string_t filename)
 
   // Convert indexes within the mem_seg to physical addresses.
   p = mem_seg;
-  string_section = (char *) (~0L);
+  maxptr = (sizeof(void*) == sizeof(int))? (char*)UINT_MAX : (char*)ULONG_MAX;
+  string_section = maxptr; //initialize the pointer with 0xff...ff
   while (p - mem_seg < statbuf.st_size && p < string_section) {
     gs_t q = (gs_t) p;
     if (gs_code_arity(gs_code(q)) > 0) { // convert kid indicese to pointers
       int j;
       for (j = 0; j < gs_code_arity(gs_code(q)); j++)
         if (gs_operand(q, j) != NULL) {
-	  GS_ASSERT((long)gs_operand(q, j) < statbuf.st_size, 
+	  GS_ASSERT((int)gs_operand(q, j) < statbuf.st_size, 
 	  	    "right offset out of bounds!.\n");
-	  gs_set_operand(q, j, (gs_t) (mem_seg + (int)(intptr_t)gs_operand(q,j)));
+	  gs_set_operand(q, j, (gs_t) (mem_seg + (long) gs_operand(q,j)));
 	}
     }
     else if (gs_code(q) == IB_STRING) { // convert string index to pointer
-      if (string_section == (char *) (~0L))
+      if (string_section == maxptr) //string section not found yet
 	string_section = mem_seg + gs_u(q);
       GS_ASSERT(gs_u(q) < statbuf.st_size, "left offset out of bounds!.\n");
       _gs_s_no_alloc (q, (gs_unsigned_char_t *) (mem_seg + gs_u(q)));
     }
+
+    _gs_em(p, false);
 
     p += gspin_node_size(gs_code(q));
     while (p - mem_seg < statbuf.st_size && p < string_section && 

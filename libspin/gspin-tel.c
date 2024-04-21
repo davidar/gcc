@@ -1,28 +1,23 @@
 /*
- * Copyright (C) 2007. PathScale, LLC.  All rights reserved.
+ * Copyright (C) 2006, 2007, 2008. PathScale Inc.  All rights reserved.
  */
 /*
-  Copyright (C) 2006, 2007. QLogic Corporation. All Rights Reserved.
 
-  This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2 of the GNU General Public License as
-  published by the Free Software Foundation.
+   Path64 is free software; you can redistribute it and/or modify it
+   under the terms of the GNU General Public License as published by
+   the Free Software Foundation version 3
 
-  This program is distributed in the hope that it would be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   Path64 is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+   License for more details.
 
-  Further, this software is distributed without any warranty that it is
-  free of the rightful claim of any third person regarding infringement
-  or the like.  Any license provided herein, whether implied or
-  otherwise, applies only to this software file.  Patent licenses, if
-  any, provided herein do not apply to combinations of this program with
-  other software, or any other product whatsoever.
+   You should have received a copy of the GNU General Public License
+   along with Path64; see the file COPYING.  If not, write to the Free
+   Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+   02110-1301, USA.
 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write the Free Software Foundation, Inc., 59
-  Temple Place - Suite 330, Boston MA 02111-1307, USA.
- */
+*/
 
 #include <string.h>
 #include <stdio.h>
@@ -954,3 +949,23 @@ gs_t gs_build_pointer_type(gs_t to_type)
   }
   return t;
 }
+
+gs_t
+gs_build_identifier(const gs_char_t * name)
+{
+  gs_t res = gs_build_0(GS_TCC_EXCEPTIONAL, GS_IDENTIFIER_NODE);
+  gs_t str = __gs(IB_STRING);
+  _gs_s(str, name, 1 + strlen(name));
+  gs_set_operand(res, GS_IDENTIFIER_POINTER, str);
+  return res;
+}
+
+gs_t
+gs_build_tree_list(gs_t value, gs_t purpose)
+{
+  gs_t res = gs_build_0(GS_TCC_EXCEPTIONAL, GS_TREE_LIST);
+  gs_set_operand(res, GS_TREE_VALUE, value);
+  gs_set_operand(res, GS_TREE_PURPOSE, purpose);
+  return res;
+}
+
