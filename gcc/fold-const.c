@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Fold a constant sub-tree into a single node for C-compiler
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
    2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
@@ -4848,7 +4851,11 @@ fold_cond_expr_with_comparison (tree type, tree arg0, tree arg1, tree arg2)
 
 
 #ifndef LOGICAL_OP_NON_SHORT_CIRCUIT
+#ifdef KEY /* bug 11517 */
+#define LOGICAL_OP_NON_SHORT_CIRCUIT (!flag_spin_file && BRANCH_COST >= 2)
+#else
 #define LOGICAL_OP_NON_SHORT_CIRCUIT (BRANCH_COST >= 2)
+#endif
 #endif
 
 /* EXP is some logical combination of boolean tests.  See if we can
@@ -9093,6 +9100,15 @@ fold_binary (enum tree_code code, tree type, tree op0, tree op1)
 
     case MULT_EXPR:
       /* (-A) * (-B) -> A * B  */
+#ifdef KEY /* bug 11662: (-A) * const -> A * (-const) causes str reduction bug,
+       * so doing the old way in GNU3 */
+      if (flag_spin_file) {
+        if (TREE_CODE (arg0) == NEGATE_EXPR && TREE_CODE (arg1) == NEGATE_EXPR)
+          return fold (build2(MULT_EXPR, type, TREE_OPERAND (arg0, 0),
+                              TREE_OPERAND (arg1, 0)));
+      }
+      else {
+#endif
       if (TREE_CODE (arg0) == NEGATE_EXPR && negate_expr_p (arg1))
 	return fold_build2 (MULT_EXPR, type,
 			    fold_convert (type, TREE_OPERAND (arg0, 0)),
@@ -9101,6 +9117,9 @@ fold_binary (enum tree_code code, tree type, tree op0, tree op1)
 	return fold_build2 (MULT_EXPR, type,
 			    fold_convert (type, negate_expr (arg0)),
 			    fold_convert (type, TREE_OPERAND (arg1, 0)));
+#ifdef KEY
+      }
+#endif
 
       if (! FLOAT_TYPE_P (type))
 	{
@@ -9339,6 +9358,16 @@ fold_binary (enum tree_code code, tree type, tree op0, tree op1)
 		    }
 		}
 
+#ifdef KEY
+	      /* Bug 11540: Do not convert x*x to pow(x,2.0), as this causes
+	         us to to generate a call to powN which is always slower
+	         than x*x. GNU knows to finally convert it back to x*x.
+	         This optimization used to be enabled by
+	         -funsafe-math-optimizations, which is enabled by:
+	         -Ofast => -ffast-math => -funsafe-math-optimizations
+	      */
+	      if (!flag_spin_file)
+#endif
 	      /* Optimize x*x as pow(x,2.0), which is expanded as x*x.  */
 	      if (! optimize_size
 		  && operand_equal_p (arg0, arg1, 0))
@@ -10617,7 +10646,13 @@ fold_binary (enum tree_code code, tree type, tree op0, tree op1)
 	 two operations, but the latter can be done in one less insn
 	 on machines that have only two-operand insns or on which a
 	 constant cannot be the first operand.  */
-      if (TREE_CODE (arg0) == BIT_AND_EXPR
+      if (
+#ifdef KEY
+	  /* Bug 8041: Do this transformation if the user has explicitly
+	     asked not to honor their shift operation.  */
+	  (!flag_spin_file || !flag_honor_shift) &&
+#endif
+	  TREE_CODE (arg0) == BIT_AND_EXPR
 	  && integer_zerop (arg1))
 	{
 	  tree arg00 = TREE_OPERAND (arg0, 0);

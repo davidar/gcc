@@ -1,3 +1,12 @@
+;
+; Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+;
+; Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
+;
+; Copyright (C) 2007 PathScale, LLC.  All Rights Reserved.
+;
+; Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+;
 ; Options for the language- and target-independent parts of the compiler.
 
 ; Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -351,6 +360,11 @@ fcx-limited-range
 Common Report Var(flag_cx_limited_range)
 Omit range reduction step when performing complex division
 
+; KEY
+fcxx-openmp
+Common Report Var(open64_cxx_openmp)
+Enable C++ OpenMP
+
 fdata-sections
 Common Report Var(flag_data_sections)
 Place data items into their own section
@@ -481,6 +495,28 @@ fguess-branch-probability
 Common Report Var(flag_guess_branch_prob)
 Enable guessing of branch probabilities
 
+; KEY: (bug 8041) honor a user-specified shift operation and disable a
+; specific constant folding operation.
+fhonor-shift
+Common Report Var(flag_honor_shift) Init(1)
+Retain shift operation as specified by the user
+
+; KEY: internal flag passed by driver to indicate compilation host
+; is i386. Ideally cc1/cc1plus should be configured differently when
+; used on i386, but we work around it by trying to mimick the configure
+; when this flag is set (bug 10532).
+fi386-host
+Common Undocumented Var(key_i386_host)
+Internal flag indicating compilation host is i386
+
+fiar
+Common Var(flag_iar_compat) Init(0)
+Turn on IAR compiler compatibility
+
+ffloat128
+Common Var(flag_float128) Init(0)
+Turn on Float128/Float128x support
+
 ; Nonzero means ignore `#ident' directives.  0 means handle them.
 ; Generate position-independent code for executables if possible
 ; On SVR4 targets, it also controls whether or not to emit a
@@ -560,6 +596,10 @@ Optimize induction variables on trees
 fjump-tables
 Common Var(flag_jump_tables) Init(1)
 Use jump tables for sufficiently large switch statements
+
+fkeil
+Common Var(flag_keil_compat) Init(0)
+Turn on Keil compiler compatibility
 
 fkeep-inline-functions
 Common Report Var(flag_keep_inline_functions)
@@ -1146,6 +1186,11 @@ Like -pedantic but issue them as errors
 quiet
 Common Var(quiet_flag)
 Do not display functions compiled or elapsed time
+
+; KEY
+spinfile
+Common  Separate
+-spinfile <file>        Place binary spin IR into <file>
 
 version
 Common Var(version_flag)

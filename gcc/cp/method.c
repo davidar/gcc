@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Handle the hair of processing (but not expanding) inline functions.
    Also manage function and variable name overloading.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
@@ -406,6 +410,11 @@ use_thunk (tree thunk_fndecl, bool emit_p)
 	  DECL_SECTION_NAME (thunk_fndecl) = DECL_SECTION_NAME (function);
 	}
     }
+
+#ifdef KEY
+  if (flag_spin_file)
+    gspin_gxx_emits_thunk_decl (thunk_fndecl);  /* generate code for the thunk */
+#endif
 
   /* The back-end expects DECL_INITIAL to contain a BLOCK, so we
      create one.  */

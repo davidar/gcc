@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Compiler driver program that can handle many languages.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation,
@@ -187,6 +190,11 @@ static int target_help_flag;
    (if this is supported by the system - see pexecute.c).  */
 
 static int report_times;
+
+#ifdef KEY
+/* Flag indicating if we were asked to write out the SPIN binary IR file. */
+static int flag_spin_file;
+#endif
 
 /* Nonzero means place this string before uses of /, so that include
    and library files can be found in an alternate location.  */
@@ -3202,6 +3210,9 @@ display_help (void)
   fputs (_("  -S                       Compile only; do not assemble or link\n"), stdout);
   fputs (_("  -c                       Compile and assemble, but do not link\n"), stdout);
   fputs (_("  -o <file>                Place the output into <file>\n"), stdout);
+#ifdef KEY
+  fputs (_("  -spinfile <file>         Place the SPIN IR into <file> and exit\n"), stdout);
+#endif
   fputs (_("\
   -x <language>            Specify the language of the following input files\n\
                            Permissible languages include: c c++ assembler none\n\
@@ -3718,6 +3729,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 	    user_specs_head = user;
 	  user_specs_tail = user;
 	}
+#ifdef KEY
+      else if (strcmp (argv[i], "-spinfile") == 0)
+	flag_spin_file = 1;
+#endif
       else if (strcmp (argv[i], "-time") == 0)
 	report_times = 1;
       else if (strcmp (argv[i], "-pipe") == 0)
@@ -6650,6 +6665,11 @@ main (int argc, char **argv)
       clear_failure_queue ();
     }
 
+#ifdef KEY
+  if (flag_spin_file)
+    goto SPIN_EXIT;
+#endif
+
   /* Reset the input file name to the first compile/object file name, for use
      with %b in LINK_SPEC. We use the first input file that we can find
      a compiler to compile it instead of using infiles.language since for
@@ -6713,6 +6733,10 @@ main (int argc, char **argv)
       if (explicit_link_files[i])
 	error ("%s: linker input file unused because linking not done",
 	       outfiles[i]);
+
+#ifdef KEY
+  SPIN_EXIT:
+#endif
 
   /* Delete some or all of the temporary files we made.  */
 

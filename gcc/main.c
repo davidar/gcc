@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* main.c: defines main() for cc1, cc1plus, etc.
 
 This file is part of GCC.
@@ -29,8 +32,22 @@ int main (int argc, char **argv);
    We do this in a separate file in order to allow the language front-end
    to define a different main(), if it so desires.  */
 
+#ifdef KEY
+/* Defined in tree.c */
+extern int    gs_argc;
+extern char **gs_argv;
+#endif
+
 int
 main (int argc, char **argv)
 {
+#ifdef KEY
+  int i;
+  gs_argc = argc;
+  gs_argv = (char **) xmalloc (argc * sizeof (char *));
+  for (i = 0; i < argc; i++)
+    gs_argv[i] = xstrdup (argv[i]);
+#endif
+
   return toplev_main (argc, (const char **) argv);
 }

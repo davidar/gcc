@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* C++-specific tree lowering bits; see also c-gimplify.c and tree-gimple.c.
 
    Copyright (C) 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -32,6 +35,10 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "hashtab.h"
 #include "pointer-set.h"
 #include "flags.h"
+
+#ifdef KEY
+#include "gspin-gcc-interface.h"
+#endif
 
 /* Local declarations.  */
 
@@ -741,6 +748,13 @@ cp_genericize (tree fndecl)
       relayout_decl (t);
     }
 
+#ifdef KEY
+  /* The comment below does not hold after our changing the point
+     where GNU does gimplification for C++. Now we clone the function
+     (constructors/destructors) BEFORE gimplification, hence the clones need to
+     be gimplified too. */
+  if (!flag_spin_file)
+#endif
   /* If we're a clone, the body is already GIMPLE.  */
   if (DECL_CLONED_FUNCTION_P (fndecl))
     return;

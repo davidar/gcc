@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Name mangling for the 3.0 C++ ABI.
    Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005
    Free Software Foundation, Inc.
@@ -59,6 +63,10 @@
 #include "varray.h"
 #include "flags.h"
 #include "target.h"
+
+#ifdef KEY
+extern int cannot_mangle_name;
+#endif
 
 /* Debugging support.  */
 
@@ -320,6 +328,20 @@ decl_is_template_id (const tree decl, tree* const template_info)
     }
   else
     {
+#ifdef KEY
+      /* If called from the spin translator, the DECL_ARGUMENTS can be NULL,
+       * which will cause seg fault when checking INNERMOST_TEMPLATE_PARMS.  If
+       * so, quit and indicate that the name cannot be reliably mangled. */
+      if (flag_spin_file) {
+        if (DECL_LANG_SPECIFIC (decl) != NULL
+            && DECL_USE_TEMPLATE (decl)
+            && DECL_ARGUMENTS(DECL_TI_TEMPLATE(decl)) == NULL) {
+          cannot_mangle_name = 1;
+          return 0;
+        }
+      }
+#endif
+
       /* Check if this is a primary template.  */
       if (DECL_LANG_SPECIFIC (decl) != NULL
 	  && DECL_USE_TEMPLATE (decl)
@@ -1213,7 +1235,20 @@ write_number (unsigned HOST_WIDE_INT number, const int unsigned_p,
 static inline void
 write_integer_cst (const tree cst)
 {
+#ifdef KEY
+  int sign;
+  /* CST is expected to be an INTEGER_CST, but it may be something else if
+   * mangling is called from the spin translator.  In this case, mangling
+   * fails.  Bug 11271. */
+  if (flag_spin_file &&
+      TREE_CODE(cst) != INTEGER_CST) {
+    cannot_mangle_name = 1;
+    return;
+  }
+  sign = tree_int_cst_sgn (cst);
+#else
   int sign = tree_int_cst_sgn (cst);
+#endif
 
   if (TREE_INT_CST_HIGH (cst) + (sign < 0))
     {

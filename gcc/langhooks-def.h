@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Default macros to initialize the lang_hooks data structure.
    Copyright 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
@@ -278,6 +281,13 @@ extern tree lhd_make_node (enum tree_code);
   LANG_HOOKS_OMP_CLAUSE_DTOR \
 }
 
+#ifdef KEY
+#define LANG_HOOKS_CPLUS_EXPAND_CONSTANT        NULL
+#define LANG_HOOKS_MANGLE_DECL                  NULL
+#define LANG_HOOKS_CP_GENERICIZE                NULL
+#define LANG_HOOKS_SIMPLIFY_AGGR_INIT_EXPRS_R   NULL
+#endif
+
 /* The whole thing.  The structure is defined in langhooks.h.  */
 #define LANG_HOOKS_INITIALIZER { \
   LANG_HOOKS_NAME, \
@@ -331,6 +341,10 @@ extern tree lhd_make_node (enum tree_code);
   LANG_HOOKS_BUILTIN_FUNCTION, \
   LANG_HOOKS_INIT_TS,          \
   LANG_HOOKS_EXPR_TO_DECL, \
+  LANG_HOOKS_CPLUS_EXPAND_CONSTANT,     /* KEY */ \
+  LANG_HOOKS_MANGLE_DECL,               /* KEY */ \
+  LANG_HOOKS_CP_GENERICIZE,             /* KEY */ \
+  LANG_HOOKS_SIMPLIFY_AGGR_INIT_EXPRS_R,/* KEY */ \
 }
 
 #endif /* GCC_LANG_HOOKS_DEF_H */

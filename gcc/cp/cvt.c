@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Language-level data type conversion for GNU C++.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -893,6 +896,11 @@ convert_to_void (tree expr, const char *implicit)
       }
 
     case TARGET_EXPR:
+#ifdef KEY
+      /* bug 12613: We need the TARGET_EXPR to process return-in-memory
+         objects while generating a call statement, so preserve it. */
+      if (!flag_spin_file)
+#endif
       /* Don't bother with the temporary object returned from a function if
 	 we don't use it and don't need to destroy it.  We'll still
 	 allocate space for it in expand_call or declare_return_variable,

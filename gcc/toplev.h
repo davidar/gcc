@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* toplev.h - Various declarations for functions found in toplev.c
    Copyright (C) 1998, 1999, 2000, 2001, 2003, 2004, 2005
    Free Software Foundation, Inc.
@@ -108,6 +111,10 @@ extern const char *dump_base_name;
 extern const char *aux_base_name;
 extern const char *aux_info_file_name;
 extern const char *asm_file_name;
+#ifdef KEY
+extern const char *spin_file_name;
+extern int flag_spin_file;
+#endif
 extern bool exit_after_options;
 
 extern int target_flags_explicit;
@@ -158,7 +165,7 @@ extern int exact_log2                  (unsigned HOST_WIDE_INT);
 extern int floor_log2                  (unsigned HOST_WIDE_INT);
 
 /* Inline versions of the above for speed.  */
-#if GCC_VERSION >= 3004
+#if 0 /* GCC_VERSION >= 3004 */ /* disable for open64 GCC front end */
 # if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
 #  define CLZ_HWI __builtin_clzl
 #  define CTZ_HWI __builtin_ctzl

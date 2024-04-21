@@ -1,4 +1,7 @@
 ; Options for the C, ObjC, C++ and ObjC++ front ends.
+;
+; Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+;
 ; Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
@@ -111,6 +114,14 @@ Do not generate #line directives
 U
 C ObjC C++ ObjC++ Joined Separate
 -U<macro>	Undefine <macro>
+
+msoft-float
+C ObjC C++ ObjC++
+float/double type supported for simplnano
+
+mlong-long
+C ObjC C++ ObjC++
+Long long type supported for simplnano
 
 Wabi
 C++ ObjC++ Var(warn_abi)
@@ -464,6 +475,11 @@ Recognize built-in functions
 
 fbuiltin-
 C ObjC C++ ObjC++ Joined
+
+; KEY bug 11660
+fc-omit-external
+C Undocumented
+Do not output certain types of external functions.
 
 fcheck-new
 C++ ObjC++
@@ -837,6 +853,11 @@ remap
 C ObjC C++ ObjC++
 Remap file names when including files
 
+; KEY
+spinfile
+C C++ Separate
+Emit spin IR file
+
 std=c++98
 C++ ObjC++
 Conform to the ISO 1998 C++ standard
@@ -852,6 +873,10 @@ Conform to the ISO 1999 C standard
 std=c9x
 C ObjC
 Deprecated in favor of -std=c99
+
+std=c11
+C ObjC
+Conform to the ISO 2011 C standard
 
 std=gnu++98
 C++ ObjC++
@@ -869,6 +894,10 @@ std=gnu9x
 C ObjC
 Deprecated in favor of -std=gnu99
 
+std=gnu11
+C ObjC
+Conform to the ISO 2011 C standard with GNU extensions
+
 std=iso9899:1990
 C ObjC
 Conform to the ISO 1990 C standard
@@ -884,6 +913,14 @@ Conform to the ISO 1999 C standard
 std=iso9899:199x
 C ObjC
 Deprecated in favor of -std=iso9899:1999
+
+std=iso9899:2011
+C ObjC
+Conform to the ISO 2011 C standard
+
+fmastiff
+C C++
+Option work for mastiff
 
 traditional-cpp
 C ObjC C++ ObjC++

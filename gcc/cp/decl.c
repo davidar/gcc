@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Process declarations and variables for C++ compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
    2001, 2002, 2003, 2004, 2005, 2006  Free Software Foundation, Inc.
@@ -1778,6 +1785,12 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
       TREE_READONLY (olddecl) = TREE_READONLY (newdecl);
       TREE_THIS_VOLATILE (olddecl) = TREE_THIS_VOLATILE (newdecl);
       TREE_SIDE_EFFECTS (olddecl) = TREE_SIDE_EFFECTS (newdecl);
+#ifdef OPEN64_SPIN
+      if (flag_spin_file) {
+          TREE_TO_TRANSLATED_GS(olddecl) = TREE_TO_TRANSLATED_GS(newdecl);
+          FULLY_TRANSLATED_TO_GS(olddecl) = FULLY_TRANSLATED_TO_GS(newdecl);
+      }
+#endif
     }
 
   /* Merge the storage class information.  */
@@ -1892,7 +1905,12 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
       if (! types_match)
 	{
 	  SET_DECL_LANGUAGE (olddecl, DECL_LANGUAGE (newdecl));
-	  COPY_DECL_ASSEMBLER_NAME (newdecl, olddecl);
+#ifdef OPEN64_SPIN
+	  if (flag_spin_file)
+	      SET_DECL_ASSEMBLER_NAME (olddecl, DECL_ASSEMBLER_NAME(newdecl));
+	  else 
+#endif
+	      COPY_DECL_ASSEMBLER_NAME (newdecl, olddecl);
 	  COPY_DECL_RTL (newdecl, olddecl);
 	}
       if (! types_match || new_defines_function)
@@ -1933,7 +1951,13 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
   TREE_ADDRESSABLE (newdecl) = TREE_ADDRESSABLE (olddecl);
   TREE_ASM_WRITTEN (newdecl) = TREE_ASM_WRITTEN (olddecl);
   DECL_COMMON (newdecl) = DECL_COMMON (olddecl);
-  COPY_DECL_ASSEMBLER_NAME (olddecl, newdecl);
+#ifdef OPEN64_SPIN
+  if (flag_spin_file)
+      SET_DECL_ASSEMBLER_NAME (newdecl, 
+              DECL_ASSEMBLER_NAME_SET_P(olddecl) ? DECL_ASSEMBLER_NAME(olddecl) : NULL);
+  else
+#endif
+      COPY_DECL_ASSEMBLER_NAME (olddecl, newdecl);
 
   /* Warn about conflicting visibility specifications.  */
   if (DECL_VISIBILITY_SPECIFIED (olddecl)
@@ -7340,7 +7364,22 @@ grokdeclarator (const cp_declarator *declarator,
 	  && !same_type_p (TYPE_MAIN_VARIANT (type), wchar_type_node)))
     {
       if (longlong)
-	type = long_long_unsigned_type_node;
+    {
+#ifdef TARG_SL
+      if (Long_Long_Support == TRUE)
+      {
+        type = long_long_unsigned_type_node;
+      }
+      else
+      {
+        warning(0, "\"unsigned long long\" is mapped to \"unsinged long\" in declaration %s, "
+                "Please use \"-mlong-long\" option to enbale long long type supporting", name);
+    	  type = long_unsigned_type_node;
+      }
+#else
+      type = long_long_unsigned_type_node;
+#endif
+   }
       else if (long_p)
 	type = long_unsigned_type_node;
       else if (short_p)
@@ -7355,7 +7394,22 @@ grokdeclarator (const cp_declarator *declarator,
   else if (signed_p && type == char_type_node)
     type = signed_char_type_node;
   else if (longlong)
+    {
+#ifdef TARG_SL
+      if (Long_Long_Support == TRUE)
+      {
+        type = long_long_integer_type_node;
+      }
+      else
+      {
+        warning(0, "\"long long\" is mapped to \"long\" in declaration %s, "
+                "Please use \"-mlong-long\" option to enbale long long type supporting", name);
+    	  type = long_integer_type_node;
+      }
+#else
     type = long_long_integer_type_node;
+#endif
+    }
   else if (long_p)
     type = long_integer_type_node;
   else if (short_p)
@@ -7363,6 +7417,9 @@ grokdeclarator (const cp_declarator *declarator,
 
   if (declspecs->specs[(int)ds_complex])
     {
+#ifdef TARG_SL
+      error("Unsupported type: \"complex\"");
+#endif
       if (TREE_CODE (type) != INTEGER_TYPE && TREE_CODE (type) != REAL_TYPE)
 	error ("complex invalid for %qs", name);
       /* If we just have "complex", it is equivalent to
@@ -7384,6 +7441,24 @@ grokdeclarator (const cp_declarator *declarator,
       else
 	type = build_complex_type (type);
     }
+
+#ifdef TARG_SL
+    if (TREE_CODE(type) == REAL_TYPE)
+    {
+      if (TYPE_MAIN_VARIANT(type) == double_type_node || TYPE_MAIN_VARIANT(type) == float_type_node)
+      {
+        if (Float_Point_Support == FALSE)
+        {
+          error("\"float/double\" type is not supported in default mode, "
+                "Please use \"-msoft-float\" option to enable float point emulation");
+        }
+      }
+      else
+      {
+        warning(0, "Unsupported real type");
+      }
+    }
+#endif
 
   type_quals = TYPE_UNQUALIFIED;
   if (declspecs->specs[(int)ds_const])
@@ -8951,6 +9026,12 @@ grokparms (cp_parameter_declarator *first_parm, tree *parms)
 }
 
 
+
+#ifdef KEY
+/* For gs_x (): */
+int (*p_copy_fn_p) (tree) = copy_fn_p;
+#endif
+
 /* D is a constructor or overloaded `operator='.
 
    Let T be the class in which D is declared. Then, this function
@@ -11232,6 +11313,9 @@ finish_function (int flags)
 	     return; see g++.dg/opt/nrv6.C.  We could be more flexible if
 	     we were to do this optimization in tree-ssa.  */
 	  && (outer = outer_curly_brace_block (fndecl))
+#if defined(KEY) && defined(TARG_X8664)
+	  && (!flag_spin_file || TREE_CODE(TREE_TYPE(TREE_TYPE(fndecl))) != VECTOR_TYPE)
+#endif
 	  && chain_member (r, BLOCK_VARS (outer)))
 	finalize_nrv (&DECL_SAVED_TREE (fndecl), r, DECL_RESULT (fndecl));
 
@@ -11277,6 +11361,12 @@ finish_function (int flags)
   if (!processing_template_decl)
     {
       struct language_function *f = DECL_SAVED_FUNCTION_DATA (fndecl);
+
+#ifdef KEY
+      /* We genericize later, in tree_rest_of_compilation, so that
+         we can work on the TREE before gimplification. */
+      if (!flag_spin_file)
+#endif
       cp_genericize (fndecl);
       /* Clear out the bits we don't need.  */
       f->x_current_class_ptr = NULL;

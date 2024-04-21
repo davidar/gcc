@@ -1,3 +1,17 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
+/*
+ * Copyright (C) 2009-2010 Advanced Micro Devices, Inc.  All Rights Reserved.
+ */
+
+/*
+ * Copyright (C) 2007. PathScale, LLC.  All rights reserved.
+ */
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Language-independent node constructors for parse phase of GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
@@ -51,6 +65,12 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "tree-flow.h"
 #include "params.h"
 #include "pointer-set.h"
+
+#ifdef KEY
+#include "dwarf2.h"
+
+extern tree cplus_expand_constant (tree);
+#endif
 
 /* Each tree code class has an associated string representation.
    These must correspond to the tree_code_class entries.  */
@@ -602,6 +622,9 @@ make_node_stat (enum tree_code code MEM_STAT_DECL)
 /* Return a new node with the same contents as NODE except that its
    TREE_CHAIN is zero and it has a fresh uid.  */
 
+/* KEY: Also gs_node translation related fields are 0, so that this new
+   node is again translated to gs_t. */
+
 tree
 copy_node_stat (tree node MEM_STAT_DECL)
 {
@@ -619,6 +642,10 @@ copy_node_stat (tree node MEM_STAT_DECL)
   TREE_ASM_WRITTEN (t) = 0;
   TREE_VISITED (t) = 0;
   t->common.ann = 0;
+#ifdef KEY
+  if (flag_spin_file)
+    TREE_TO_TRANSLATED_GS (t) = 0;
+#endif
 
   if (TREE_CODE_CLASS (code) == tcc_declaration)
     {
@@ -3458,6 +3485,18 @@ is_attribute_with_length_p (const char *attr, int attr_len, tree ident)
       && strcmp (attr, p) == 0)
     return 1;
 
+  /* KEIL compiler may use __text or __text__ in p.
+     If p is '__text'/'__text__', check if ATTR is `text' */
+  if (flag_keil_compat && p[0] == '_')
+    {
+      gcc_assert (p[1] == '_');
+      if (ident_len == attr_len + 2
+          && strcmp(attr, p + 2) == 0)
+        return 1;
+      else if (ident_len == attr_len + 4
+               && strncmp(attr, p + 2, attr_len) == 0)
+        return 1;
+    }
   /* If ATTR is `__text__', IDENT must be `text'; and vice versa.  */
   if (attr[0] == '_')
     {
@@ -7773,3 +7812,4323 @@ empty_body_p (tree stmt)
 }
 
 #include "gt-tree.h"
+#ifdef KEY
+/**
+  The following are no longer present in GNU 4.2.0, and so should be
+  obsoleted out of libspin and wgen.
+    // DECL_ARG_TYPE_AS_WRITTEN
+    // DECL_TRANSPARENT_UNION
+    // IX86_BUILTIN_CMPNEPS
+    // IX86_BUILTIN_CMPNESS
+ **/
+
+#include "cp/cp-tree.h"
+#include "diagnostic.h"
+
+#include "gspin-gcc-interface.h"
+
+/* Bug 1392 */
+#include <stdlib.h>
+#include <ctype.h>
+#include "c-common.h" 
+
+enum language { C, CPP };
+enum language language = C;
+#define CPR() (language == CPP)
+#define CR()  (language == C)
+
+/* C++ Dummy Variables Section Begins. */
+#define DUMMY_WEAK __attribute__((weak))
+tree global_namespace DUMMY_WEAK; /* CP_DECL_CONTEXT () references this variable in cp/name-lookup.c */
+int (*p_uses_template_parms) (tree) DUMMY_WEAK;
+tree (*p_most_general_template) (tree) DUMMY_WEAK;
+int (*p_copy_fn_p) (tree) DUMMY_WEAK;
+int (*p_is_empty_class) (tree) DUMMY_WEAK;
+tree (*p_namespace_binding) (tree, tree) DUMMY_WEAK;
+/* tree p_complete_ctor_identifier; */
+tree cp_global_trees[CPTI_MAX] DUMMY_WEAK;
+tree (*p_get_tinfo_decl) (tree) DUMMY_WEAK;
+/* C++ Dummy Variables Section Ends. */
+
+/* GSPIN stuff follows: */
+
+static inline gs_code_t
+gcc2gs (int code)
+{
+ switch (code) {
+ 
+ /* GCC Specific tree codes: return ; */
+
+   case ABS_EXPR: return GS_ABS_EXPR;
+   case ADDR_EXPR: return GS_ADDR_EXPR;
+   case AGGR_INIT_EXPR: return GS_AGGR_INIT_EXPR;
+   case ALIGNOF_EXPR: return GS_ALIGNOF_EXPR;
+   case ALIGN_INDIRECT_REF: return GS_ALIGN_INDIRECT_REF;
+   case ARRAY_RANGE_REF: return GS_ARRAY_RANGE_REF;
+   case ARRAY_REF: return GS_ARRAY_REF;
+   case ARRAY_TYPE: return GS_ARRAY_TYPE;
+   case ARROW_EXPR: return GS_ARROW_EXPR;
+   case ASM_EXPR: return GS_ASM_EXPR;
+   case BASELINK: return GS_BASELINK;
+   case BIND_EXPR: return GS_BIND_EXPR;
+   case BIT_AND_EXPR: return GS_BIT_AND_EXPR;
+   case BIT_FIELD_REF: return GS_BIT_FIELD_REF;
+   case BIT_IOR_EXPR: return GS_BIT_IOR_EXPR;
+   case BIT_NOT_EXPR: return GS_BIT_NOT_EXPR;
+   case BIT_XOR_EXPR: return GS_BIT_XOR_EXPR;
+   case BLOCK: return GS_BLOCK;
+   case BOOLEAN_TYPE: return GS_BOOLEAN_TYPE;
+   case BOUND_TEMPLATE_TEMPLATE_PARM: 
+     return GS_BOUND_TEMPLATE_TEMPLATE_PARM;
+   case BREAK_STMT: return GS_BREAK_STMT;
+   case CALL_EXPR: return GS_CALL_EXPR;
+   case CAST_EXPR: return GS_CAST_EXPR;
+   case CONST_CAST_EXPR: return GS_CONST_CAST_EXPR;
+   case CASE_LABEL_EXPR: return GS_CASE_LABEL_EXPR;
+   case CATCH_EXPR: return GS_CATCH_EXPR;
+   case CEIL_DIV_EXPR: return GS_CEIL_DIV_EXPR;
+   case CEIL_MOD_EXPR: return GS_CEIL_MOD_EXPR;
+   case CLEANUP_STMT: return GS_CLEANUP_STMT;
+   case CLEANUP_POINT_EXPR: return GS_CLEANUP_POINT_EXPR;
+   case COMPLEX_CST: return GS_COMPLEX_CST;
+   case COMPLEX_EXPR: return GS_COMPLEX_EXPR;
+   case COMPLEX_TYPE: return GS_COMPLEX_TYPE;
+   case COMPONENT_REF: return GS_COMPONENT_REF;
+   case COMPOUND_EXPR: return GS_COMPOUND_EXPR;
+   case COMPOUND_LITERAL_EXPR: return GS_COMPOUND_LITERAL_EXPR;
+   case COND_EXPR: return GS_COND_EXPR;
+   case CONJ_EXPR: return GS_CONJ_EXPR;
+   case CONSTRUCTOR: return GS_CONSTRUCTOR;
+   case CONST_DECL: return GS_CONST_DECL;
+   case CONTINUE_STMT: return GS_CONTINUE_STMT;
+   case CONVERT_EXPR: return GS_CONVERT_EXPR;
+   case CTOR_INITIALIZER: return GS_CTOR_INITIALIZER;
+   case DECL_EXPR: return GS_DECL_EXPR;
+   case DELETE_EXPR: return GS_DELETE_EXPR;
+   case DEFAULT_ARG: return GS_DEFAULT_ARG;
+   case DYNAMIC_CAST_EXPR: return GS_DYNAMIC_CAST_EXPR;
+   case DO_STMT: return GS_DO_STMT;
+   case DOTSTAR_EXPR: return GS_DOTSTAR_EXPR;
+   case EH_FILTER_EXPR: return GS_EH_FILTER_EXPR;
+   case EMPTY_CLASS_EXPR: return GS_EMPTY_CLASS_EXPR;
+   case ENUMERAL_TYPE: return GS_ENUMERAL_TYPE;
+   case EQ_EXPR: return GS_EQ_EXPR;
+   case ERROR_MARK: return GS_ERROR_MARK;
+   case EXACT_DIV_EXPR: return GS_EXACT_DIV_EXPR;
+   case EXC_PTR_EXPR: return GS_EXC_PTR_EXPR;
+   case EXIT_EXPR: return GS_EXIT_EXPR;
+   case EXPR_STMT: return GS_EXPR_STMT;
+   case EH_SPEC_BLOCK: return GS_EH_SPEC_BLOCK;
+   case FDESC_EXPR: return GS_FDESC_EXPR;
+   case FIELD_DECL: return GS_FIELD_DECL;
+   case FILTER_EXPR: return GS_FILTER_EXPR;
+   case FIX_CEIL_EXPR: return GS_FIX_CEIL_EXPR;
+   case FIX_FLOOR_EXPR: return GS_FIX_FLOOR_EXPR;
+   case FIX_ROUND_EXPR: return GS_FIX_ROUND_EXPR;
+   case FIX_TRUNC_EXPR: return GS_FIX_TRUNC_EXPR;
+   case FLOAT_EXPR: return GS_FLOAT_EXPR;
+   case FLOOR_DIV_EXPR: return GS_FLOOR_DIV_EXPR;
+   case FLOOR_MOD_EXPR: return GS_FLOOR_MOD_EXPR;
+   case FOR_STMT: return GS_FOR_STMT;
+   case FUNCTION_DECL: return GS_FUNCTION_DECL;
+   case FUNCTION_TYPE: return GS_FUNCTION_TYPE;
+   case GE_EXPR: return GS_GE_EXPR;
+   case GOTO_EXPR: return GS_GOTO_EXPR;
+   case GT_EXPR: return GS_GT_EXPR;
+   case HANDLER: return GS_HANDLER;
+   case IDENTIFIER_NODE: return GS_IDENTIFIER_NODE;
+   case IF_STMT: return GS_IF_STMT;
+   case IMAGPART_EXPR: return GS_IMAGPART_EXPR;
+   case INDIRECT_REF: return GS_INDIRECT_REF;
+   case INIT_EXPR: return GS_INIT_EXPR;
+   case INTEGER_CST: return GS_INTEGER_CST;
+   case INTEGER_TYPE: return GS_INTEGER_TYPE;
+   case LABEL_DECL: return GS_LABEL_DECL;
+   case LABEL_EXPR: return GS_LABEL_EXPR;
+   case LANG_TYPE: return GS_LANG_TYPE;
+   case LE_EXPR: return GS_LE_EXPR;
+   case LOOP_EXPR: return GS_LOOP_EXPR;
+   case LROTATE_EXPR: return GS_LROTATE_EXPR;
+   case LSHIFT_EXPR: return GS_LSHIFT_EXPR;
+   case LTGT_EXPR: return GS_LTGT_EXPR;
+   case LT_EXPR: return GS_LT_EXPR;
+   case MAX_EXPR: return GS_MAX_EXPR;
+   case MEMBER_REF: return GS_MEMBER_REF;
+   case METHOD_TYPE: return GS_METHOD_TYPE;
+   case MINUS_EXPR: return GS_MINUS_EXPR;
+   case MIN_EXPR: return GS_MIN_EXPR;
+   case MISALIGNED_INDIRECT_REF: return GS_MISALIGNED_INDIRECT_REF;
+   case MODOP_EXPR: return GS_MODOP_EXPR;
+   case MODIFY_EXPR: return GS_MODIFY_EXPR;
+   case MULT_EXPR: return GS_MULT_EXPR;
+   case MUST_NOT_THROW_EXPR: return GS_MUST_NOT_THROW_EXPR;
+   case NAMESPACE_DECL: return GS_NAMESPACE_DECL;
+   case NE_EXPR: return GS_NE_EXPR;
+   case NEGATE_EXPR: return GS_NEGATE_EXPR;
+   case NEW_EXPR: return GS_NEW_EXPR;
+   case NON_LVALUE_EXPR: return GS_NON_LVALUE_EXPR;
+   case NOP_EXPR: return GS_NOP_EXPR;
+   case NON_DEPENDENT_EXPR: return GS_NON_DEPENDENT_EXPR;
+   case OBJ_TYPE_REF: return GS_OBJ_TYPE_REF;
+   case OFFSET_REF: return GS_OFFSET_REF;
+   case OFFSET_TYPE: return GS_OFFSET_TYPE;
+   case OFFSETOF_EXPR: return GS_OFFSETOF_EXPR;
+   case OMP_ATOMIC: return GS_OMP_ATOMIC;
+   case OMP_CLAUSE: return GS_OMP_CLAUSE;
+   case OMP_CRITICAL: return GS_OMP_CRITICAL;
+   case OMP_FOR: return GS_OMP_FOR;
+   case OMP_MASTER: return GS_OMP_MASTER;
+   case OMP_ORDERED: return GS_OMP_ORDERED;
+   case OMP_PARALLEL: return GS_OMP_PARALLEL;
+   case OMP_SECTION: return GS_OMP_SECTION;
+   case OMP_SECTIONS: return GS_OMP_SECTIONS;
+   case OMP_SINGLE: return GS_OMP_SINGLE;
+   case ORDERED_EXPR: return GS_ORDERED_EXPR;
+   case OVERLOAD: return GS_OVERLOAD;
+   case PARM_DECL: return GS_PARM_DECL;
+   case PHI_NODE: return GS_PHI_NODE;
+   case PLACEHOLDER_EXPR: return GS_PLACEHOLDER_EXPR;
+   case PLUS_EXPR: return GS_PLUS_EXPR;
+   case POINTER_TYPE: return GS_POINTER_TYPE;
+   case POLYNOMIAL_CHREC: return GS_POLYNOMIAL_CHREC;
+   case POSTDECREMENT_EXPR: return GS_POSTDECREMENT_EXPR;
+   case POSTINCREMENT_EXPR: return GS_POSTINCREMENT_EXPR;
+   case PREDECREMENT_EXPR: return GS_PREDECREMENT_EXPR;
+   case PREINCREMENT_EXPR: return GS_PREINCREMENT_EXPR;
+   case PTRMEM_CST: return GS_PTRMEM_CST;
+   case PSEUDO_DTOR_EXPR: return GS_PSEUDO_DTOR_EXPR;
+   case QUAL_UNION_TYPE: return GS_QUAL_UNION_TYPE;
+   case RANGE_EXPR: return GS_RANGE_EXPR;
+   case RDIV_EXPR: return GS_RDIV_EXPR;
+   case REALIGN_LOAD_EXPR: return GS_REALIGN_LOAD_EXPR;
+   case REALPART_EXPR: return GS_REALPART_EXPR;
+   case REAL_CST: return GS_REAL_CST;
+   case REAL_TYPE: return GS_REAL_TYPE;
+   case RECORD_TYPE: return GS_RECORD_TYPE;
+   case REINTERPRET_CAST_EXPR: return GS_REINTERPRET_CAST_EXPR;
+   case REFERENCE_TYPE: return GS_REFERENCE_TYPE;
+   case RESULT_DECL: return GS_RESULT_DECL;
+   case RESX_EXPR: return GS_RESX_EXPR;
+   case RETURN_EXPR: return GS_RETURN_EXPR;
+   case ROUND_DIV_EXPR: return GS_ROUND_DIV_EXPR;
+   case ROUND_MOD_EXPR: return GS_ROUND_MOD_EXPR;
+   case RROTATE_EXPR: return GS_RROTATE_EXPR;
+   case RSHIFT_EXPR: return GS_RSHIFT_EXPR;
+   case SAVE_EXPR: return GS_SAVE_EXPR;
+   case SCEV_KNOWN: return GS_SCEV_KNOWN;
+   case SCEV_NOT_KNOWN: return GS_SCEV_NOT_KNOWN;
+   case SCOPE_REF: return GS_SCOPE_REF;
+   case SIZEOF_EXPR: return GS_SIZEOF_EXPR;
+   case SSA_NAME: return GS_SSA_NAME;
+   case STATEMENT_LIST: return GS_STATEMENT_LIST;
+   case STATIC_CAST_EXPR: return GS_STATIC_CAST_EXPR;
+   case STMT_EXPR: return GS_STMT_EXPR;
+   case STRING_CST: return GS_STRING_CST;
+   case SWITCH_EXPR: return GS_SWITCH_EXPR;
+   case SWITCH_STMT: return GS_SWITCH_STMT;
+   case TARGET_EXPR: return GS_TARGET_EXPR;
+   case TAG_DEFN: return GS_TAG_DEFN;
+   case TEMPLATE_DECL:  return GS_TEMPLATE_DECL;
+   case TEMPLATE_ID_EXPR:  return GS_TEMPLATE_ID_EXPR;
+   case TEMPLATE_PARM_INDEX:  return GS_TEMPLATE_PARM_INDEX;
+   case TEMPLATE_TYPE_PARM:  return GS_TEMPLATE_TYPE_PARM;
+   case THROW_EXPR: return GS_THROW_EXPR;
+   case TINST_LEVEL: return GS_TINST_LEVEL;
+   case TRANSLATION_UNIT_DECL: return GS_TRANSLATION_UNIT_DECL;
+   case TREE_BINFO: return GS_TREE_BINFO;
+   case TREE_LIST: return GS_TREE_LIST;
+   case TREE_VEC: return GS_TREE_VEC;
+   case TRUNC_DIV_EXPR: return GS_TRUNC_DIV_EXPR;
+   case TRUNC_MOD_EXPR: return GS_TRUNC_MOD_EXPR;
+   case TRUTH_ANDIF_EXPR: return GS_TRUTH_ANDIF_EXPR;
+   case TRUTH_AND_EXPR: return GS_TRUTH_AND_EXPR;
+   case TRUTH_NOT_EXPR: return GS_TRUTH_NOT_EXPR;
+   case TRUTH_ORIF_EXPR: return GS_TRUTH_ORIF_EXPR;
+   case TRUTH_OR_EXPR: return GS_TRUTH_OR_EXPR;
+   case TRUTH_XOR_EXPR: return GS_TRUTH_XOR_EXPR;
+   case TRY_BLOCK: return GS_TRY_BLOCK;
+   case TRY_CATCH_EXPR: return GS_TRY_CATCH_EXPR;
+   case TRY_FINALLY_EXPR: return GS_TRY_FINALLY_EXPR;
+   case TYPEOF_TYPE: return GS_TYPEOF_TYPE;
+   case TYPENAME_TYPE: return GS_TYPENAME_TYPE;
+   case TYPE_DECL: return GS_TYPE_DECL;
+   case TYPE_EXPR: return GS_TYPE_EXPR;
+   case TYPEID_EXPR: return GS_TYPEID_EXPR;
+   case USING_DECL: return GS_USING_DECL;
+   case USING_STMT: return GS_USING_STMT;
+   case UNBOUND_CLASS_TEMPLATE: return GS_UNBOUND_CLASS_TEMPLATE;
+   case UNEQ_EXPR: return GS_UNEQ_EXPR;
+   case UNGE_EXPR: return GS_UNGE_EXPR;
+   case UNGT_EXPR: return GS_UNGT_EXPR;
+   case UNION_TYPE: return GS_UNION_TYPE;
+   case UNLE_EXPR: return GS_UNLE_EXPR;
+   case UNLT_EXPR: return GS_UNLT_EXPR;
+   case UNORDERED_EXPR: return GS_UNORDERED_EXPR;
+   case VALUE_HANDLE: return GS_VALUE_HANDLE;
+   case VAR_DECL: return GS_VAR_DECL;
+   case VA_ARG_EXPR: return GS_VA_ARG_EXPR;
+   case VECTOR_CST: return GS_VECTOR_CST;
+   case VECTOR_TYPE: return GS_VECTOR_TYPE;
+   case VEC_COND_EXPR: return GS_VEC_COND_EXPR;
+   case VEC_DELETE_EXPR: return GS_VEC_DELETE_EXPR;
+   case VEC_NEW_EXPR: return GS_VEC_NEW_EXPR;
+   case VIEW_CONVERT_EXPR: return GS_VIEW_CONVERT_EXPR;
+   case VOID_TYPE: return GS_VOID_TYPE;
+   case WHILE_STMT: return GS_WHILE_STMT;
+   case WITH_CLEANUP_EXPR: return GS_WITH_CLEANUP_EXPR;
+   case WITH_SIZE_EXPR: return GS_WITH_SIZE_EXPR;
+   case TEMPLATE_TEMPLATE_PARM: return GS_TEMPLATE_TEMPLATE_PARM;
+   case FREQ_HINT_STMT: return GS_FREQ_HINT_STMT;
+   case ZDL_STMT: return GS_ZDL_STMT;
+ }
+ gcc_assert(0);
+ return (gs_code_t) 0;
+}
+
+static inline gs_tree_code_class_t
+gcc_class2gs_class (int class) 
+{
+  switch (class) {
+    case tcc_exceptional: return GS_TCC_EXCEPTIONAL;
+    case tcc_constant: return GS_TCC_CONSTANT;
+    case tcc_type: return GS_TCC_TYPE;     
+    case tcc_declaration: return GS_TCC_DECLARATION;
+    case tcc_reference: return GS_TCC_REFERENCE; 
+    case tcc_comparison: return GS_TCC_COMPARISON;
+    case tcc_unary: return GS_TCC_UNARY;
+    case tcc_binary: return GS_TCC_BINARY;  
+    case tcc_statement: return GS_TCC_STATEMENT;
+    case tcc_expression: return GS_TCC_EXPRESSION;
+  }
+  gcc_assert (0);
+  return (gs_tree_code_class_t) 0;
+}
+
+static inline gsbi_t
+gcc_built_in2gsbi (enum built_in_function code)
+{
+  switch (code) {
+
+    case BUILT_IN_ACOS: return GSBI_BUILT_IN_ACOS;
+    case BUILT_IN_ACOSF: return GSBI_BUILT_IN_ACOSF;
+    case BUILT_IN_ACOSH: return GSBI_BUILT_IN_ACOSH;
+    case BUILT_IN_ACOSHF: return GSBI_BUILT_IN_ACOSHF;
+    case BUILT_IN_ACOSHL: return GSBI_BUILT_IN_ACOSHL;
+    case BUILT_IN_ACOSL: return GSBI_BUILT_IN_ACOSL;
+    case BUILT_IN_ASIN: return GSBI_BUILT_IN_ASIN;
+    case BUILT_IN_ASINF: return GSBI_BUILT_IN_ASINF;
+    case BUILT_IN_ASINH: return GSBI_BUILT_IN_ASINH;
+    case BUILT_IN_ASINHF: return GSBI_BUILT_IN_ASINHF;
+    case BUILT_IN_ASINHL: return GSBI_BUILT_IN_ASINHL;
+    case BUILT_IN_ASINL: return GSBI_BUILT_IN_ASINL;
+    case BUILT_IN_ATAN: return GSBI_BUILT_IN_ATAN;
+    case BUILT_IN_ATAN2: return GSBI_BUILT_IN_ATAN2;
+    case BUILT_IN_ATAN2F: return GSBI_BUILT_IN_ATAN2F;
+    case BUILT_IN_ATAN2L: return GSBI_BUILT_IN_ATAN2L;
+    case BUILT_IN_ATANF: return GSBI_BUILT_IN_ATANF;
+    case BUILT_IN_ATANH: return GSBI_BUILT_IN_ATANH;
+    case BUILT_IN_ATANHF: return GSBI_BUILT_IN_ATANHF;
+    case BUILT_IN_ATANHL: return GSBI_BUILT_IN_ATANHL;
+    case BUILT_IN_ATANL: return GSBI_BUILT_IN_ATANL;
+    case BUILT_IN_CBRT: return GSBI_BUILT_IN_CBRT;
+    case BUILT_IN_CBRTF: return GSBI_BUILT_IN_CBRTF;
+    case BUILT_IN_CBRTL: return GSBI_BUILT_IN_CBRTL;
+    case BUILT_IN_CEIL: return GSBI_BUILT_IN_CEIL;
+    case BUILT_IN_CEILF: return GSBI_BUILT_IN_CEILF;
+    case BUILT_IN_CEILL: return GSBI_BUILT_IN_CEILL;
+    case BUILT_IN_COPYSIGN: return GSBI_BUILT_IN_COPYSIGN;
+    case BUILT_IN_COPYSIGNF: return GSBI_BUILT_IN_COPYSIGNF;
+    case BUILT_IN_COPYSIGNL: return GSBI_BUILT_IN_COPYSIGNL;
+    case BUILT_IN_COS: return GSBI_BUILT_IN_COS;
+    case BUILT_IN_COSF: return GSBI_BUILT_IN_COSF;
+    case BUILT_IN_COSH: return GSBI_BUILT_IN_COSH;
+    case BUILT_IN_COSHF: return GSBI_BUILT_IN_COSHF;
+    case BUILT_IN_COSHL: return GSBI_BUILT_IN_COSHL;
+    case BUILT_IN_COSL: return GSBI_BUILT_IN_COSL;
+    case BUILT_IN_DREM: return GSBI_BUILT_IN_DREM;
+    case BUILT_IN_DREMF: return GSBI_BUILT_IN_DREMF;
+    case BUILT_IN_DREML: return GSBI_BUILT_IN_DREML;
+    case BUILT_IN_ERF: return GSBI_BUILT_IN_ERF;
+    case BUILT_IN_ERFC: return GSBI_BUILT_IN_ERFC;
+    case BUILT_IN_ERFCF: return GSBI_BUILT_IN_ERFCF;
+    case BUILT_IN_ERFCL: return GSBI_BUILT_IN_ERFCL;
+    case BUILT_IN_ERFF: return GSBI_BUILT_IN_ERFF;
+    case BUILT_IN_ERFL: return GSBI_BUILT_IN_ERFL;
+    case BUILT_IN_EXP: return GSBI_BUILT_IN_EXP;
+    case BUILT_IN_EXP10: return GSBI_BUILT_IN_EXP10;
+    case BUILT_IN_EXP10F: return GSBI_BUILT_IN_EXP10F;
+    case BUILT_IN_EXP10L: return GSBI_BUILT_IN_EXP10L;
+    case BUILT_IN_EXP2: return GSBI_BUILT_IN_EXP2;
+    case BUILT_IN_EXP2F: return GSBI_BUILT_IN_EXP2F;
+    case BUILT_IN_EXP2L: return GSBI_BUILT_IN_EXP2L;
+    case BUILT_IN_EXPF: return GSBI_BUILT_IN_EXPF;
+    case BUILT_IN_EXPL: return GSBI_BUILT_IN_EXPL;
+    case BUILT_IN_EXPM1: return GSBI_BUILT_IN_EXPM1;
+    case BUILT_IN_EXPM1F: return GSBI_BUILT_IN_EXPM1F;
+    case BUILT_IN_EXPM1L: return GSBI_BUILT_IN_EXPM1L;
+    case BUILT_IN_FABS: return GSBI_BUILT_IN_FABS;
+    case BUILT_IN_FABSF: return GSBI_BUILT_IN_FABSF;
+    case BUILT_IN_FABSL: return GSBI_BUILT_IN_FABSL;
+    case BUILT_IN_FDIM: return GSBI_BUILT_IN_FDIM;
+    case BUILT_IN_FDIMF: return GSBI_BUILT_IN_FDIMF;
+    case BUILT_IN_FDIML: return GSBI_BUILT_IN_FDIML;
+    case BUILT_IN_FLOOR: return GSBI_BUILT_IN_FLOOR;
+    case BUILT_IN_FLOORF: return GSBI_BUILT_IN_FLOORF;
+    case BUILT_IN_FLOORL: return GSBI_BUILT_IN_FLOORL;
+    case BUILT_IN_FMA: return GSBI_BUILT_IN_FMA;
+    case BUILT_IN_FMAF: return GSBI_BUILT_IN_FMAF;
+    case BUILT_IN_FMAL: return GSBI_BUILT_IN_FMAL;
+    case BUILT_IN_FMAX: return GSBI_BUILT_IN_FMAX;
+    case BUILT_IN_FMAXF: return GSBI_BUILT_IN_FMAXF;
+    case BUILT_IN_FMAXL: return GSBI_BUILT_IN_FMAXL;
+    case BUILT_IN_FMIN: return GSBI_BUILT_IN_FMIN;
+    case BUILT_IN_FMINF: return GSBI_BUILT_IN_FMINF;
+    case BUILT_IN_FMINL: return GSBI_BUILT_IN_FMINL;
+    case BUILT_IN_FMOD: return GSBI_BUILT_IN_FMOD;
+    case BUILT_IN_FMODF: return GSBI_BUILT_IN_FMODF;
+    case BUILT_IN_FMODL: return GSBI_BUILT_IN_FMODL;
+    case BUILT_IN_FREXP: return GSBI_BUILT_IN_FREXP;
+    case BUILT_IN_FREXPF: return GSBI_BUILT_IN_FREXPF;
+    case BUILT_IN_FREXPL: return GSBI_BUILT_IN_FREXPL;
+    case BUILT_IN_GAMMA: return GSBI_BUILT_IN_GAMMA;
+    case BUILT_IN_GAMMAF: return GSBI_BUILT_IN_GAMMAF;
+    case BUILT_IN_GAMMAL: return GSBI_BUILT_IN_GAMMAL;
+    case BUILT_IN_HUGE_VAL: return GSBI_BUILT_IN_HUGE_VAL;
+    case BUILT_IN_HUGE_VALF: return GSBI_BUILT_IN_HUGE_VALF;
+    case BUILT_IN_HUGE_VALL: return GSBI_BUILT_IN_HUGE_VALL;
+    case BUILT_IN_HYPOT: return GSBI_BUILT_IN_HYPOT;
+    case BUILT_IN_HYPOTF: return GSBI_BUILT_IN_HYPOTF;
+    case BUILT_IN_HYPOTL: return GSBI_BUILT_IN_HYPOTL;
+    case BUILT_IN_ILOGB: return GSBI_BUILT_IN_ILOGB;
+    case BUILT_IN_ILOGBF: return GSBI_BUILT_IN_ILOGBF;
+    case BUILT_IN_ILOGBL: return GSBI_BUILT_IN_ILOGBL;
+    case BUILT_IN_INF: return GSBI_BUILT_IN_INF;
+    case BUILT_IN_INFF: return GSBI_BUILT_IN_INFF;
+    case BUILT_IN_INFL: return GSBI_BUILT_IN_INFL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_INFD32: return GSBI_BUILT_IN_INFD32;
+    case BUILT_IN_INFD64: return GSBI_BUILT_IN_INFD64;
+    case BUILT_IN_INFD128: return GSBI_BUILT_IN_INFD128;
+#endif
+    case BUILT_IN_J0: return GSBI_BUILT_IN_J0;
+    case BUILT_IN_J0F: return GSBI_BUILT_IN_J0F;
+    case BUILT_IN_J0L: return GSBI_BUILT_IN_J0L;
+    case BUILT_IN_J1: return GSBI_BUILT_IN_J1;
+    case BUILT_IN_J1F: return GSBI_BUILT_IN_J1F;
+    case BUILT_IN_J1L: return GSBI_BUILT_IN_J1L;
+    case BUILT_IN_JN: return GSBI_BUILT_IN_JN;
+    case BUILT_IN_JNF: return GSBI_BUILT_IN_JNF;
+    case BUILT_IN_JNL: return GSBI_BUILT_IN_JNL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_LCEIL: return GSBI_BUILT_IN_LCEIL;
+    case BUILT_IN_LCEILF: return GSBI_BUILT_IN_LCEILF;
+    case BUILT_IN_LCEILL: return GSBI_BUILT_IN_LCEILL;
+#endif
+    case BUILT_IN_LDEXP: return GSBI_BUILT_IN_LDEXP;
+    case BUILT_IN_LDEXPF: return GSBI_BUILT_IN_LDEXPF;
+    case BUILT_IN_LDEXPL: return GSBI_BUILT_IN_LDEXPL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_LFLOOR: return GSBI_BUILT_IN_LFLOOR;
+    case BUILT_IN_LFLOORF: return GSBI_BUILT_IN_LFLOORF;
+    case BUILT_IN_LFLOORL: return GSBI_BUILT_IN_LFLOORL;
+#endif
+    case BUILT_IN_LGAMMA: return GSBI_BUILT_IN_LGAMMA;
+    case BUILT_IN_LGAMMAF: return GSBI_BUILT_IN_LGAMMAF;
+    case BUILT_IN_LGAMMAL: return GSBI_BUILT_IN_LGAMMAL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_LLCEIL: return GSBI_BUILT_IN_LLCEIL;
+    case BUILT_IN_LLCEILF: return GSBI_BUILT_IN_LLCEILF;
+    case BUILT_IN_LLCEILL: return GSBI_BUILT_IN_LLCEILL;
+    case BUILT_IN_LLFLOOR: return GSBI_BUILT_IN_LLFLOOR;
+    case BUILT_IN_LLFLOORF: return GSBI_BUILT_IN_LLFLOORF;
+    case BUILT_IN_LLFLOORL: return GSBI_BUILT_IN_LLFLOORL;
+#endif
+    case BUILT_IN_LLRINT: return GSBI_BUILT_IN_LLRINT;
+    case BUILT_IN_LLRINTF: return GSBI_BUILT_IN_LLRINTF;
+    case BUILT_IN_LLRINTL: return GSBI_BUILT_IN_LLRINTL;
+    case BUILT_IN_LLROUND: return GSBI_BUILT_IN_LLROUND;
+    case BUILT_IN_LLROUNDF: return GSBI_BUILT_IN_LLROUNDF;
+    case BUILT_IN_LLROUNDL: return GSBI_BUILT_IN_LLROUNDL;
+    case BUILT_IN_LOG: return GSBI_BUILT_IN_LOG;
+    case BUILT_IN_LOG10: return GSBI_BUILT_IN_LOG10;
+    case BUILT_IN_LOG10F: return GSBI_BUILT_IN_LOG10F;
+    case BUILT_IN_LOG10L: return GSBI_BUILT_IN_LOG10L;
+    case BUILT_IN_LOG1P: return GSBI_BUILT_IN_LOG1P;
+    case BUILT_IN_LOG1PF: return GSBI_BUILT_IN_LOG1PF;
+    case BUILT_IN_LOG1PL: return GSBI_BUILT_IN_LOG1PL;
+    case BUILT_IN_LOG2: return GSBI_BUILT_IN_LOG2;
+    case BUILT_IN_LOG2F: return GSBI_BUILT_IN_LOG2F;
+    case BUILT_IN_LOG2L: return GSBI_BUILT_IN_LOG2L;
+    case BUILT_IN_LOGB: return GSBI_BUILT_IN_LOGB;
+    case BUILT_IN_LOGBF: return GSBI_BUILT_IN_LOGBF;
+    case BUILT_IN_LOGBL: return GSBI_BUILT_IN_LOGBL;
+    case BUILT_IN_LOGF: return GSBI_BUILT_IN_LOGF;
+    case BUILT_IN_LOGL: return GSBI_BUILT_IN_LOGL;
+    case BUILT_IN_LRINT: return GSBI_BUILT_IN_LRINT;
+    case BUILT_IN_LRINTF: return GSBI_BUILT_IN_LRINTF;
+    case BUILT_IN_LRINTL: return GSBI_BUILT_IN_LRINTL;
+    case BUILT_IN_LROUND: return GSBI_BUILT_IN_LROUND;
+    case BUILT_IN_LROUNDF: return GSBI_BUILT_IN_LROUNDF;
+    case BUILT_IN_LROUNDL: return GSBI_BUILT_IN_LROUNDL;
+    case BUILT_IN_MODF: return GSBI_BUILT_IN_MODF;
+    case BUILT_IN_MODFF: return GSBI_BUILT_IN_MODFF;
+    case BUILT_IN_MODFL: return GSBI_BUILT_IN_MODFL;
+    case BUILT_IN_NAN: return GSBI_BUILT_IN_NAN;
+    case BUILT_IN_NANF: return GSBI_BUILT_IN_NANF;
+    case BUILT_IN_NANL: return GSBI_BUILT_IN_NANL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_NAND32: return GSBI_BUILT_IN_NAND32;
+    case BUILT_IN_NAND64: return GSBI_BUILT_IN_NAND64;
+    case BUILT_IN_NAND128: return GSBI_BUILT_IN_NAND128;
+#endif
+    case BUILT_IN_NANS: return GSBI_BUILT_IN_NANS;
+    case BUILT_IN_NANSF: return GSBI_BUILT_IN_NANSF;
+    case BUILT_IN_NANSL: return GSBI_BUILT_IN_NANSL;
+    case BUILT_IN_NEARBYINT: return GSBI_BUILT_IN_NEARBYINT;
+    case BUILT_IN_NEARBYINTF: return GSBI_BUILT_IN_NEARBYINTF;
+    case BUILT_IN_NEARBYINTL: return GSBI_BUILT_IN_NEARBYINTL;
+    case BUILT_IN_NEXTAFTER: return GSBI_BUILT_IN_NEXTAFTER;
+    case BUILT_IN_NEXTAFTERF: return GSBI_BUILT_IN_NEXTAFTERF;
+    case BUILT_IN_NEXTAFTERL: return GSBI_BUILT_IN_NEXTAFTERL;
+    case BUILT_IN_NEXTTOWARD: return GSBI_BUILT_IN_NEXTTOWARD;
+    case BUILT_IN_NEXTTOWARDF: return GSBI_BUILT_IN_NEXTTOWARDF;
+    case BUILT_IN_NEXTTOWARDL: return GSBI_BUILT_IN_NEXTTOWARDL;
+    case BUILT_IN_POW: return GSBI_BUILT_IN_POW;
+    case BUILT_IN_POW10: return GSBI_BUILT_IN_POW10;
+    case BUILT_IN_POW10F: return GSBI_BUILT_IN_POW10F;
+    case BUILT_IN_POW10L: return GSBI_BUILT_IN_POW10L;
+    case BUILT_IN_POWF: return GSBI_BUILT_IN_POWF;
+    case BUILT_IN_POWI: return GSBI_BUILT_IN_POWI;
+    case BUILT_IN_POWIF: return GSBI_BUILT_IN_POWIF;
+    case BUILT_IN_POWIL: return GSBI_BUILT_IN_POWIL;
+    case BUILT_IN_POWL: return GSBI_BUILT_IN_POWL;
+    case BUILT_IN_REMAINDER: return GSBI_BUILT_IN_REMAINDER;
+    case BUILT_IN_REMAINDERF: return GSBI_BUILT_IN_REMAINDERF;
+    case BUILT_IN_REMAINDERL: return GSBI_BUILT_IN_REMAINDERL;
+    case BUILT_IN_REMQUO: return GSBI_BUILT_IN_REMQUO;
+    case BUILT_IN_REMQUOF: return GSBI_BUILT_IN_REMQUOF;
+    case BUILT_IN_REMQUOL: return GSBI_BUILT_IN_REMQUOL;
+    case BUILT_IN_RINT: return GSBI_BUILT_IN_RINT;
+    case BUILT_IN_RINTF: return GSBI_BUILT_IN_RINTF;
+    case BUILT_IN_RINTL: return GSBI_BUILT_IN_RINTL;
+    case BUILT_IN_ROUND: return GSBI_BUILT_IN_ROUND;
+    case BUILT_IN_ROUNDF: return GSBI_BUILT_IN_ROUNDF;
+    case BUILT_IN_ROUNDL: return GSBI_BUILT_IN_ROUNDL;
+    case BUILT_IN_SCALB: return GSBI_BUILT_IN_SCALB;
+    case BUILT_IN_SCALBF: return GSBI_BUILT_IN_SCALBF;
+    case BUILT_IN_SCALBL: return GSBI_BUILT_IN_SCALBL;
+    case BUILT_IN_SCALBLN: return GSBI_BUILT_IN_SCALBLN;
+    case BUILT_IN_SCALBLNF: return GSBI_BUILT_IN_SCALBLNF;
+    case BUILT_IN_SCALBLNL: return GSBI_BUILT_IN_SCALBLNL;
+    case BUILT_IN_SCALBN: return GSBI_BUILT_IN_SCALBN;
+    case BUILT_IN_SCALBNF: return GSBI_BUILT_IN_SCALBNF;
+    case BUILT_IN_SCALBNL: return GSBI_BUILT_IN_SCALBNL;
+    case BUILT_IN_SIGNBIT: return GSBI_BUILT_IN_SIGNBIT;
+    case BUILT_IN_SIGNBITF: return GSBI_BUILT_IN_SIGNBITF;
+    case BUILT_IN_SIGNBITL: return GSBI_BUILT_IN_SIGNBITL;
+    case BUILT_IN_SIGNIFICAND: return GSBI_BUILT_IN_SIGNIFICAND;
+    case BUILT_IN_SIGNIFICANDF: return GSBI_BUILT_IN_SIGNIFICANDF;
+    case BUILT_IN_SIGNIFICANDL: return GSBI_BUILT_IN_SIGNIFICANDL;
+    case BUILT_IN_SIN: return GSBI_BUILT_IN_SIN;
+    case BUILT_IN_SINCOS: return GSBI_BUILT_IN_SINCOS;
+    case BUILT_IN_SINCOSF: return GSBI_BUILT_IN_SINCOSF;
+    case BUILT_IN_SINCOSL: return GSBI_BUILT_IN_SINCOSL;
+    case BUILT_IN_SINF: return GSBI_BUILT_IN_SINF;
+    case BUILT_IN_SINH: return GSBI_BUILT_IN_SINH;
+    case BUILT_IN_SINHF: return GSBI_BUILT_IN_SINHF;
+    case BUILT_IN_SINHL: return GSBI_BUILT_IN_SINHL;
+    case BUILT_IN_SINL: return GSBI_BUILT_IN_SINL;
+    case BUILT_IN_SQRT: return GSBI_BUILT_IN_SQRT;
+    case BUILT_IN_SQRTF: return GSBI_BUILT_IN_SQRTF;
+    case BUILT_IN_SQRTL: return GSBI_BUILT_IN_SQRTL;
+    case BUILT_IN_TAN: return GSBI_BUILT_IN_TAN;
+    case BUILT_IN_TANF: return GSBI_BUILT_IN_TANF;
+    case BUILT_IN_TANH: return GSBI_BUILT_IN_TANH;
+    case BUILT_IN_TANHF: return GSBI_BUILT_IN_TANHF;
+    case BUILT_IN_TANHL: return GSBI_BUILT_IN_TANHL;
+    case BUILT_IN_TANL: return GSBI_BUILT_IN_TANL;
+    case BUILT_IN_TGAMMA: return GSBI_BUILT_IN_TGAMMA;
+    case BUILT_IN_TGAMMAF: return GSBI_BUILT_IN_TGAMMAF;
+    case BUILT_IN_TGAMMAL: return GSBI_BUILT_IN_TGAMMAL;
+    case BUILT_IN_TRUNC: return GSBI_BUILT_IN_TRUNC;
+    case BUILT_IN_TRUNCF: return GSBI_BUILT_IN_TRUNCF;
+    case BUILT_IN_TRUNCL: return GSBI_BUILT_IN_TRUNCL;
+    case BUILT_IN_Y0: return GSBI_BUILT_IN_Y0;
+    case BUILT_IN_Y0F: return GSBI_BUILT_IN_Y0F;
+    case BUILT_IN_Y0L: return GSBI_BUILT_IN_Y0L;
+    case BUILT_IN_Y1: return GSBI_BUILT_IN_Y1;
+    case BUILT_IN_Y1F: return GSBI_BUILT_IN_Y1F;
+    case BUILT_IN_Y1L: return GSBI_BUILT_IN_Y1L;
+    case BUILT_IN_YN: return GSBI_BUILT_IN_YN;
+    case BUILT_IN_YNF: return GSBI_BUILT_IN_YNF;
+    case BUILT_IN_YNL: return GSBI_BUILT_IN_YNL;
+    case BUILT_IN_CABS: return GSBI_BUILT_IN_CABS;
+    case BUILT_IN_CABSF: return GSBI_BUILT_IN_CABSF;
+    case BUILT_IN_CABSL: return GSBI_BUILT_IN_CABSL;
+    case BUILT_IN_CACOS: return GSBI_BUILT_IN_CACOS;
+    case BUILT_IN_CACOSF: return GSBI_BUILT_IN_CACOSF;
+    case BUILT_IN_CACOSH: return GSBI_BUILT_IN_CACOSH;
+    case BUILT_IN_CACOSHF: return GSBI_BUILT_IN_CACOSHF;
+    case BUILT_IN_CACOSHL: return GSBI_BUILT_IN_CACOSHL;
+    case BUILT_IN_CACOSL: return GSBI_BUILT_IN_CACOSL;
+    case BUILT_IN_CARG: return GSBI_BUILT_IN_CARG;
+    case BUILT_IN_CARGF: return GSBI_BUILT_IN_CARGF;
+    case BUILT_IN_CARGL: return GSBI_BUILT_IN_CARGL;
+    case BUILT_IN_CASIN: return GSBI_BUILT_IN_CASIN;
+    case BUILT_IN_CASINF: return GSBI_BUILT_IN_CASINF;
+    case BUILT_IN_CASINH: return GSBI_BUILT_IN_CASINH;
+    case BUILT_IN_CASINHF: return GSBI_BUILT_IN_CASINHF;
+    case BUILT_IN_CASINHL: return GSBI_BUILT_IN_CASINHL;
+    case BUILT_IN_CASINL: return GSBI_BUILT_IN_CASINL;
+    case BUILT_IN_CATAN: return GSBI_BUILT_IN_CATAN;
+    case BUILT_IN_CATANF: return GSBI_BUILT_IN_CATANF;
+    case BUILT_IN_CATANH: return GSBI_BUILT_IN_CATANH;
+    case BUILT_IN_CATANHF: return GSBI_BUILT_IN_CATANHF;
+    case BUILT_IN_CATANHL: return GSBI_BUILT_IN_CATANHL;
+    case BUILT_IN_CATANL: return GSBI_BUILT_IN_CATANL;
+    case BUILT_IN_CCOS: return GSBI_BUILT_IN_CCOS;
+    case BUILT_IN_CCOSF: return GSBI_BUILT_IN_CCOSF;
+    case BUILT_IN_CCOSH: return GSBI_BUILT_IN_CCOSH;
+    case BUILT_IN_CCOSHF: return GSBI_BUILT_IN_CCOSHF;
+    case BUILT_IN_CCOSHL: return GSBI_BUILT_IN_CCOSHL;
+    case BUILT_IN_CCOSL: return GSBI_BUILT_IN_CCOSL;
+    case BUILT_IN_CEXP: return GSBI_BUILT_IN_CEXP;
+    case BUILT_IN_CEXPF: return GSBI_BUILT_IN_CEXPF;
+    case BUILT_IN_CEXPL: return GSBI_BUILT_IN_CEXPL;
+    case BUILT_IN_CIMAG: return GSBI_BUILT_IN_CIMAG;
+    case BUILT_IN_CIMAGF: return GSBI_BUILT_IN_CIMAGF;
+    case BUILT_IN_CIMAGL: return GSBI_BUILT_IN_CIMAGL;
+    case BUILT_IN_CLOG: return GSBI_BUILT_IN_CLOG;
+    case BUILT_IN_CLOGF: return GSBI_BUILT_IN_CLOGF;
+    case BUILT_IN_CLOGL: return GSBI_BUILT_IN_CLOGL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_CLOG10: return GSBI_BUILT_IN_CLOG10;
+    case BUILT_IN_CLOG10F: return GSBI_BUILT_IN_CLOG10F;
+    case BUILT_IN_CLOG10L: return GSBI_BUILT_IN_CLOG10L;
+#endif
+    case BUILT_IN_CONJ: return GSBI_BUILT_IN_CONJ;
+    case BUILT_IN_CONJF: return GSBI_BUILT_IN_CONJF;
+    case BUILT_IN_CONJL: return GSBI_BUILT_IN_CONJL;
+    case BUILT_IN_CPOW: return GSBI_BUILT_IN_CPOW;
+    case BUILT_IN_CPOWF: return GSBI_BUILT_IN_CPOWF;
+    case BUILT_IN_CPOWL: return GSBI_BUILT_IN_CPOWL;
+    case BUILT_IN_CPROJ: return GSBI_BUILT_IN_CPROJ;
+    case BUILT_IN_CPROJF: return GSBI_BUILT_IN_CPROJF;
+    case BUILT_IN_CPROJL: return GSBI_BUILT_IN_CPROJL;
+    case BUILT_IN_CREAL: return GSBI_BUILT_IN_CREAL;
+    case BUILT_IN_CREALF: return GSBI_BUILT_IN_CREALF;
+    case BUILT_IN_CREALL: return GSBI_BUILT_IN_CREALL;
+    case BUILT_IN_CSIN: return GSBI_BUILT_IN_CSIN;
+    case BUILT_IN_CSINF: return GSBI_BUILT_IN_CSINF;
+    case BUILT_IN_CSINH: return GSBI_BUILT_IN_CSINH;
+    case BUILT_IN_CSINHF: return GSBI_BUILT_IN_CSINHF;
+    case BUILT_IN_CSINHL: return GSBI_BUILT_IN_CSINHL;
+    case BUILT_IN_CSINL: return GSBI_BUILT_IN_CSINL;
+    case BUILT_IN_CSQRT: return GSBI_BUILT_IN_CSQRT;
+    case BUILT_IN_CSQRTF: return GSBI_BUILT_IN_CSQRTF;
+    case BUILT_IN_CSQRTL: return GSBI_BUILT_IN_CSQRTL;
+    case BUILT_IN_CTAN: return GSBI_BUILT_IN_CTAN;
+    case BUILT_IN_CTANF: return GSBI_BUILT_IN_CTANF;
+    case BUILT_IN_CTANH: return GSBI_BUILT_IN_CTANH;
+    case BUILT_IN_CTANHF: return GSBI_BUILT_IN_CTANHF;
+    case BUILT_IN_CTANHL: return GSBI_BUILT_IN_CTANHL;
+    case BUILT_IN_CTANL: return GSBI_BUILT_IN_CTANL;
+    case BUILT_IN_BCMP: return GSBI_BUILT_IN_BCMP;
+    case BUILT_IN_BCOPY: return GSBI_BUILT_IN_BCOPY;
+    case BUILT_IN_BZERO: return GSBI_BUILT_IN_BZERO;
+    case BUILT_IN_INDEX: return GSBI_BUILT_IN_INDEX;
+    case BUILT_IN_MEMCMP: return GSBI_BUILT_IN_MEMCMP;
+    case BUILT_IN_MEMCPY: return GSBI_BUILT_IN_MEMCPY;
+    case BUILT_IN_MEMMOVE: return GSBI_BUILT_IN_MEMMOVE;
+    case BUILT_IN_MEMPCPY: return GSBI_BUILT_IN_MEMPCPY;
+    case BUILT_IN_MEMSET: return GSBI_BUILT_IN_MEMSET;
+    case BUILT_IN_RINDEX: return GSBI_BUILT_IN_RINDEX;
+    case BUILT_IN_STPCPY: return GSBI_BUILT_IN_STPCPY;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_STPNCPY: return GSBI_BUILT_IN_STPNCPY;
+    case BUILT_IN_STRCASECMP: return GSBI_BUILT_IN_STRCASECMP;
+#endif
+    case BUILT_IN_STRCAT: return GSBI_BUILT_IN_STRCAT;
+    case BUILT_IN_STRCHR: return GSBI_BUILT_IN_STRCHR;
+    case BUILT_IN_STRCMP: return GSBI_BUILT_IN_STRCMP;
+    case BUILT_IN_STRCPY: return GSBI_BUILT_IN_STRCPY;
+    case BUILT_IN_STRCSPN: return GSBI_BUILT_IN_STRCSPN;
+    case BUILT_IN_STRDUP: return GSBI_BUILT_IN_STRDUP;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_STRNDUP: return GSBI_BUILT_IN_STRNDUP;
+#endif
+    case BUILT_IN_STRLEN: return GSBI_BUILT_IN_STRLEN;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_STRNCASECMP: return GSBI_BUILT_IN_STRNCASECMP;
+#endif
+    case BUILT_IN_STRNCAT: return GSBI_BUILT_IN_STRNCAT;
+    case BUILT_IN_STRNCMP: return GSBI_BUILT_IN_STRNCMP;
+    case BUILT_IN_STRNCPY: return GSBI_BUILT_IN_STRNCPY;
+    case BUILT_IN_STRPBRK: return GSBI_BUILT_IN_STRPBRK;
+    case BUILT_IN_STRRCHR: return GSBI_BUILT_IN_STRRCHR;
+    case BUILT_IN_STRSPN: return GSBI_BUILT_IN_STRSPN;
+    case BUILT_IN_STRSTR: return GSBI_BUILT_IN_STRSTR;
+    case BUILT_IN_FPRINTF: return GSBI_BUILT_IN_FPRINTF;
+    case BUILT_IN_FPRINTF_UNLOCKED: return GSBI_BUILT_IN_FPRINTF_UNLOCKED;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_PUTC: return GSBI_BUILT_IN_PUTC;
+    case BUILT_IN_PUTC_UNLOCKED: return GSBI_BUILT_IN_PUTC_UNLOCKED;
+#endif
+    case BUILT_IN_FPUTC: return GSBI_BUILT_IN_FPUTC;
+    case BUILT_IN_FPUTC_UNLOCKED: return GSBI_BUILT_IN_FPUTC_UNLOCKED;
+    case BUILT_IN_FPUTS: return GSBI_BUILT_IN_FPUTS;
+    case BUILT_IN_FPUTS_UNLOCKED: return GSBI_BUILT_IN_FPUTS_UNLOCKED;
+    case BUILT_IN_FSCANF: return GSBI_BUILT_IN_FSCANF;
+    case BUILT_IN_FWRITE: return GSBI_BUILT_IN_FWRITE;
+    case BUILT_IN_FWRITE_UNLOCKED: return GSBI_BUILT_IN_FWRITE_UNLOCKED;
+    case BUILT_IN_PRINTF: return GSBI_BUILT_IN_PRINTF;
+    case BUILT_IN_PRINTF_UNLOCKED: return GSBI_BUILT_IN_PRINTF_UNLOCKED;
+    case BUILT_IN_PUTCHAR: return GSBI_BUILT_IN_PUTCHAR;
+    case BUILT_IN_PUTCHAR_UNLOCKED: return GSBI_BUILT_IN_PUTCHAR_UNLOCKED;
+    case BUILT_IN_PUTS: return GSBI_BUILT_IN_PUTS;
+    case BUILT_IN_PUTS_UNLOCKED: return GSBI_BUILT_IN_PUTS_UNLOCKED;
+    case BUILT_IN_SCANF: return GSBI_BUILT_IN_SCANF;
+    case BUILT_IN_SNPRINTF: return GSBI_BUILT_IN_SNPRINTF;
+    case BUILT_IN_SPRINTF: return GSBI_BUILT_IN_SPRINTF;
+    case BUILT_IN_SSCANF: return GSBI_BUILT_IN_SSCANF;
+    case BUILT_IN_VFPRINTF: return GSBI_BUILT_IN_VFPRINTF;
+    case BUILT_IN_VFSCANF: return GSBI_BUILT_IN_VFSCANF;
+    case BUILT_IN_VPRINTF: return GSBI_BUILT_IN_VPRINTF;
+    case BUILT_IN_VSCANF: return GSBI_BUILT_IN_VSCANF;
+    case BUILT_IN_VSNPRINTF: return GSBI_BUILT_IN_VSNPRINTF;
+    case BUILT_IN_VSPRINTF: return GSBI_BUILT_IN_VSPRINTF;
+    case BUILT_IN_VSSCANF: return GSBI_BUILT_IN_VSSCANF;
+    case BUILT_IN_ISALNUM: return GSBI_BUILT_IN_ISALNUM;
+    case BUILT_IN_ISALPHA: return GSBI_BUILT_IN_ISALPHA;
+    case BUILT_IN_ISASCII: return GSBI_BUILT_IN_ISASCII;
+    case BUILT_IN_ISBLANK: return GSBI_BUILT_IN_ISBLANK;
+    case BUILT_IN_ISCNTRL: return GSBI_BUILT_IN_ISCNTRL;
+    case BUILT_IN_ISDIGIT: return GSBI_BUILT_IN_ISDIGIT;
+    case BUILT_IN_ISGRAPH: return GSBI_BUILT_IN_ISGRAPH;
+    case BUILT_IN_ISLOWER: return GSBI_BUILT_IN_ISLOWER;
+    case BUILT_IN_ISPRINT: return GSBI_BUILT_IN_ISPRINT;
+    case BUILT_IN_ISPUNCT: return GSBI_BUILT_IN_ISPUNCT;
+    case BUILT_IN_ISSPACE: return GSBI_BUILT_IN_ISSPACE;
+    case BUILT_IN_ISUPPER: return GSBI_BUILT_IN_ISUPPER;
+    case BUILT_IN_ISXDIGIT: return GSBI_BUILT_IN_ISXDIGIT;
+    case BUILT_IN_TOASCII: return GSBI_BUILT_IN_TOASCII;
+    case BUILT_IN_TOLOWER: return GSBI_BUILT_IN_TOLOWER;
+    case BUILT_IN_TOUPPER: return GSBI_BUILT_IN_TOUPPER;
+    case BUILT_IN_ISWALNUM: return GSBI_BUILT_IN_ISWALNUM;
+    case BUILT_IN_ISWALPHA: return GSBI_BUILT_IN_ISWALPHA;
+    case BUILT_IN_ISWBLANK: return GSBI_BUILT_IN_ISWBLANK;
+    case BUILT_IN_ISWCNTRL: return GSBI_BUILT_IN_ISWCNTRL;
+    case BUILT_IN_ISWDIGIT: return GSBI_BUILT_IN_ISWDIGIT;
+    case BUILT_IN_ISWGRAPH: return GSBI_BUILT_IN_ISWGRAPH;
+    case BUILT_IN_ISWLOWER: return GSBI_BUILT_IN_ISWLOWER;
+    case BUILT_IN_ISWPRINT: return GSBI_BUILT_IN_ISWPRINT;
+    case BUILT_IN_ISWPUNCT: return GSBI_BUILT_IN_ISWPUNCT;
+    case BUILT_IN_ISWSPACE: return GSBI_BUILT_IN_ISWSPACE;
+    case BUILT_IN_ISWUPPER: return GSBI_BUILT_IN_ISWUPPER;
+    case BUILT_IN_ISWXDIGIT: return GSBI_BUILT_IN_ISWXDIGIT;
+    case BUILT_IN_TOWLOWER: return GSBI_BUILT_IN_TOWLOWER;
+    case BUILT_IN_TOWUPPER: return GSBI_BUILT_IN_TOWUPPER;
+    case BUILT_IN_CTYPE_B_LOC: return GSBI_BUILT_IN_CTYPE_B_LOC;
+    case BUILT_IN_CTYPE_TOUPPER_LOC: return GSBI_BUILT_IN_CTYPE_TOUPPER_LOC;
+    case BUILT_IN_CTYPE_TOLOWER_LOC: return GSBI_BUILT_IN_CTYPE_TOLOWER_LOC;
+    case BUILT_IN_ABORT: return GSBI_BUILT_IN_ABORT;
+    case BUILT_IN_ABS: return GSBI_BUILT_IN_ABS;
+    case BUILT_IN_AGGREGATE_INCOMING_ADDRESS: return GSBI_BUILT_IN_AGGREGATE_INCOMING_ADDRESS;
+    case BUILT_IN_ALLOCA: return GSBI_BUILT_IN_ALLOCA;
+    case BUILT_IN_APPLY: return GSBI_BUILT_IN_APPLY;
+    case BUILT_IN_APPLY_ARGS: return GSBI_BUILT_IN_APPLY_ARGS;
+    case BUILT_IN_ARGS_INFO: return GSBI_BUILT_IN_ARGS_INFO;
+    case BUILT_IN_BSWAP16: return GSBI_BUILT_IN_BSWAP16;
+    case BUILT_IN_BSWAP32: return GSBI_BUILT_IN_BSWAP32;
+    case BUILT_IN_BSWAP64: return GSBI_BUILT_IN_BSWAP64;
+    case BUILT_IN_CALLOC: return GSBI_BUILT_IN_CALLOC;
+    case BUILT_IN_CLASSIFY_TYPE: return GSBI_BUILT_IN_CLASSIFY_TYPE;
+    case BUILT_IN_CLZ: return GSBI_BUILT_IN_CLZ;
+    case BUILT_IN_CLZIMAX: return GSBI_BUILT_IN_CLZIMAX;
+    case BUILT_IN_CLZL: return GSBI_BUILT_IN_CLZL;
+    case BUILT_IN_CLZLL: return GSBI_BUILT_IN_CLZLL;
+    case BUILT_IN_CONSTANT_P: return GSBI_BUILT_IN_CONSTANT_P;
+    case BUILT_IN_CTZ: return GSBI_BUILT_IN_CTZ;
+    case BUILT_IN_CTZIMAX: return GSBI_BUILT_IN_CTZIMAX;
+    case BUILT_IN_CTZL: return GSBI_BUILT_IN_CTZL;
+    case BUILT_IN_CTZLL: return GSBI_BUILT_IN_CTZLL;
+    case BUILT_IN_DCGETTEXT: return GSBI_BUILT_IN_DCGETTEXT;
+    case BUILT_IN_DGETTEXT: return GSBI_BUILT_IN_DGETTEXT;
+    case BUILT_IN_DWARF_CFA: return GSBI_BUILT_IN_DWARF_CFA;
+    case BUILT_IN_DWARF_SP_COLUMN: return GSBI_BUILT_IN_DWARF_SP_COLUMN;
+    case BUILT_IN_EH_RETURN: return GSBI_BUILT_IN_EH_RETURN;
+    case BUILT_IN_EH_RETURN_DATA_REGNO: return GSBI_BUILT_IN_EH_RETURN_DATA_REGNO;
+    case BUILT_IN_EXECL: return GSBI_BUILT_IN_EXECL;
+    case BUILT_IN_EXECLP: return GSBI_BUILT_IN_EXECLP;
+    case BUILT_IN_EXECLE: return GSBI_BUILT_IN_EXECLE;
+    case BUILT_IN_EXECV: return GSBI_BUILT_IN_EXECV;
+    case BUILT_IN_EXECVP: return GSBI_BUILT_IN_EXECVP;
+    case BUILT_IN_EXECVE: return GSBI_BUILT_IN_EXECVE;
+    case BUILT_IN_EXIT: return GSBI_BUILT_IN_EXIT;
+    case BUILT_IN_EXPECT: return GSBI_BUILT_IN_EXPECT;
+    case BUILT_IN_EXTEND_POINTER: return GSBI_BUILT_IN_EXTEND_POINTER;
+    case BUILT_IN_EXTRACT_RETURN_ADDR: return GSBI_BUILT_IN_EXTRACT_RETURN_ADDR;
+    case BUILT_IN_FFS: return GSBI_BUILT_IN_FFS;
+    case BUILT_IN_FFSIMAX: return GSBI_BUILT_IN_FFSIMAX;
+    case BUILT_IN_FFSL: return GSBI_BUILT_IN_FFSL;
+    case BUILT_IN_FFSLL: return GSBI_BUILT_IN_FFSLL;
+    case BUILT_IN_FORK: return GSBI_BUILT_IN_FORK;
+    case BUILT_IN_FRAME_ADDRESS: return GSBI_BUILT_IN_FRAME_ADDRESS;
+    case BUILT_IN_FROB_RETURN_ADDR: return GSBI_BUILT_IN_FROB_RETURN_ADDR;
+    case BUILT_IN_GETTEXT: return GSBI_BUILT_IN_GETTEXT;
+    case BUILT_IN_IMAXABS: return GSBI_BUILT_IN_IMAXABS;
+    case BUILT_IN_INIT_DWARF_REG_SIZES: return GSBI_BUILT_IN_INIT_DWARF_REG_SIZES;
+    case BUILT_IN_FINITE: return GSBI_BUILT_IN_FINITE;
+    case BUILT_IN_FINITEF: return GSBI_BUILT_IN_FINITEF;
+    case BUILT_IN_FINITEL: return GSBI_BUILT_IN_FINITEL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_FINITED32: return GSBI_BUILT_IN_FINITED32;
+    case BUILT_IN_FINITED64: return GSBI_BUILT_IN_FINITED64;
+    case BUILT_IN_FINITED128: return GSBI_BUILT_IN_FINITED128;
+#endif
+    case BUILT_IN_FPCLASSIFY: return GSBI_BUILT_IN_FPCLASSIFY;
+    case BUILT_IN_ISFINITE: return GSBI_BUILT_IN_ISFINITE;
+    case BUILT_IN_ISINF_SIGN: return GSBI_BUILT_IN_ISINF_SIGN;
+
+    case BUILT_IN_ISINF: return GSBI_BUILT_IN_ISINF;
+    case BUILT_IN_ISINFF: return GSBI_BUILT_IN_ISINFF;
+    case BUILT_IN_ISINFL: return GSBI_BUILT_IN_ISINFL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_ISINFD32: return GSBI_BUILT_IN_ISINFD32;
+    case BUILT_IN_ISINFD64: return GSBI_BUILT_IN_ISINFD64;
+    case BUILT_IN_ISINFD128: return GSBI_BUILT_IN_ISINFD128;
+#endif
+    case BUILT_IN_ISNAN: return GSBI_BUILT_IN_ISNAN;
+    case BUILT_IN_ISNANF: return GSBI_BUILT_IN_ISNANF;
+    case BUILT_IN_ISNANL: return GSBI_BUILT_IN_ISNANL;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_ISNAND32: return GSBI_BUILT_IN_ISNAND32;
+    case BUILT_IN_ISNAND64: return GSBI_BUILT_IN_ISNAND64;
+    case BUILT_IN_ISNAND128: return GSBI_BUILT_IN_ISNAND128;
+#endif
+    case BUILT_IN_ISGREATER: return GSBI_BUILT_IN_ISGREATER;
+    case BUILT_IN_ISGREATEREQUAL: return GSBI_BUILT_IN_ISGREATEREQUAL;
+    case BUILT_IN_ISLESS: return GSBI_BUILT_IN_ISLESS;
+    case BUILT_IN_ISLESSEQUAL: return GSBI_BUILT_IN_ISLESSEQUAL;
+    case BUILT_IN_ISLESSGREATER: return GSBI_BUILT_IN_ISLESSGREATER;
+    case BUILT_IN_ISUNORDERED: return GSBI_BUILT_IN_ISUNORDERED;
+    case BUILT_IN_LABS: return GSBI_BUILT_IN_LABS;
+    case BUILT_IN_LLABS: return GSBI_BUILT_IN_LLABS;
+    case BUILT_IN_LONGJMP: return GSBI_BUILT_IN_LONGJMP;
+    case BUILT_IN_MALLOC: return GSBI_BUILT_IN_MALLOC;
+    case BUILT_IN_NEXT_ARG: return GSBI_BUILT_IN_NEXT_ARG;
+    case BUILT_IN_PARITY: return GSBI_BUILT_IN_PARITY;
+    case BUILT_IN_PARITYIMAX: return GSBI_BUILT_IN_PARITYIMAX;
+    case BUILT_IN_PARITYL: return GSBI_BUILT_IN_PARITYL;
+    case BUILT_IN_PARITYLL: return GSBI_BUILT_IN_PARITYLL;
+    case BUILT_IN_POPCOUNT: return GSBI_BUILT_IN_POPCOUNT;
+    case BUILT_IN_POPCOUNTIMAX: return GSBI_BUILT_IN_POPCOUNTIMAX;
+    case BUILT_IN_POPCOUNTL: return GSBI_BUILT_IN_POPCOUNTL;
+    case BUILT_IN_POPCOUNTLL: return GSBI_BUILT_IN_POPCOUNTLL;
+    case BUILT_IN_PREFETCH: return GSBI_BUILT_IN_PREFETCH;
+    case BUILT_IN_RETURN: return GSBI_BUILT_IN_RETURN;
+    case BUILT_IN_RETURN_ADDRESS: return GSBI_BUILT_IN_RETURN_ADDRESS;
+    case BUILT_IN_SAVEREGS: return GSBI_BUILT_IN_SAVEREGS;
+    case BUILT_IN_SETJMP: return GSBI_BUILT_IN_SETJMP;
+    case BUILT_IN_STDARG_START: return GSBI_BUILT_IN_STDARG_START;
+    case BUILT_IN_STRFMON: return GSBI_BUILT_IN_STRFMON;
+    case BUILT_IN_STRFTIME: return GSBI_BUILT_IN_STRFTIME;
+    case BUILT_IN_TRAP: return GSBI_BUILT_IN_TRAP;
+    case BUILT_IN_UNWIND_INIT: return GSBI_BUILT_IN_UNWIND_INIT;
+    case BUILT_IN_UPDATE_SETJMP_BUF: return GSBI_BUILT_IN_UPDATE_SETJMP_BUF;
+    case BUILT_IN_VA_ARG_PACK: return GSBI_BUILT_IN_VA_ARG_PACK;
+    case BUILT_IN_VA_ARG_PACK_LEN: return GSBI_BUILT_IN_VA_ARG_PACK_LEN;
+    case BUILT_IN_VA_COPY: return GSBI_BUILT_IN_VA_COPY;
+    case BUILT_IN_VA_END: return GSBI_BUILT_IN_VA_END;
+    case BUILT_IN_VA_START: return GSBI_BUILT_IN_VA_START;
+    case BUILT_IN__EXIT: return GSBI_BUILT_IN__EXIT;
+    case BUILT_IN__EXIT2: return GSBI_BUILT_IN__EXIT2;
+    case BUILT_IN_INIT_TRAMPOLINE: return GSBI_BUILT_IN_INIT_TRAMPOLINE;
+    case BUILT_IN_ADJUST_TRAMPOLINE: return GSBI_BUILT_IN_ADJUST_TRAMPOLINE;
+    case BUILT_IN_NONLOCAL_GOTO: return GSBI_BUILT_IN_NONLOCAL_GOTO;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_SETJMP_SETUP: return GSBI_BUILT_IN_SETJMP_SETUP;
+    case BUILT_IN_SETJMP_DISPATCHER: return GSBI_BUILT_IN_SETJMP_DISPATCHER;
+    case BUILT_IN_SETJMP_RECEIVER: return GSBI_BUILT_IN_SETJMP_RECEIVER;
+#endif
+    case BUILT_IN_STACK_SAVE: return GSBI_BUILT_IN_STACK_SAVE;
+    case BUILT_IN_STACK_RESTORE: return GSBI_BUILT_IN_STACK_RESTORE;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_OBJECT_SIZE: return GSBI_BUILT_IN_OBJECT_SIZE;
+    case BUILT_IN_MEMCPY_CHK: return GSBI_BUILT_IN_MEMCPY_CHK;
+    case BUILT_IN_MEMMOVE_CHK: return GSBI_BUILT_IN_MEMMOVE_CHK;
+    case BUILT_IN_MEMPCPY_CHK: return GSBI_BUILT_IN_MEMPCPY_CHK;
+    case BUILT_IN_MEMSET_CHK: return GSBI_BUILT_IN_MEMSET_CHK;
+    case BUILT_IN_STPCPY_CHK: return GSBI_BUILT_IN_STPCPY_CHK;
+    case BUILT_IN_STRCAT_CHK: return GSBI_BUILT_IN_STRCAT_CHK;
+    case BUILT_IN_STRCPY_CHK: return GSBI_BUILT_IN_STRCPY_CHK;
+    case BUILT_IN_STRNCAT_CHK: return GSBI_BUILT_IN_STRNCAT_CHK;
+    case BUILT_IN_STRNCPY_CHK: return GSBI_BUILT_IN_STRNCPY_CHK;
+    case BUILT_IN_SNPRINTF_CHK: return GSBI_BUILT_IN_SNPRINTF_CHK;
+    case BUILT_IN_SPRINTF_CHK: return GSBI_BUILT_IN_SPRINTF_CHK;
+    case BUILT_IN_VSNPRINTF_CHK: return GSBI_BUILT_IN_VSNPRINTF_CHK;
+    case BUILT_IN_VSPRINTF_CHK: return GSBI_BUILT_IN_VSPRINTF_CHK;
+    case BUILT_IN_FPRINTF_CHK: return GSBI_BUILT_IN_FPRINTF_CHK;
+    case BUILT_IN_PRINTF_CHK: return GSBI_BUILT_IN_PRINTF_CHK;
+    case BUILT_IN_VFPRINTF_CHK: return GSBI_BUILT_IN_VFPRINTF_CHK;
+    case BUILT_IN_VPRINTF_CHK: return GSBI_BUILT_IN_VPRINTF_CHK;
+#endif
+    case BUILT_IN_PROFILE_FUNC_ENTER: return GSBI_BUILT_IN_PROFILE_FUNC_ENTER;
+    case BUILT_IN_PROFILE_FUNC_EXIT: return GSBI_BUILT_IN_PROFILE_FUNC_EXIT;
+#ifdef FE_GNU_4_2_0
+    case BUILT_IN_FETCH_AND_ADD_N: return GSBI_BUILT_IN_FETCH_AND_ADD_N;
+    case BUILT_IN_FETCH_AND_ADD_1: return GSBI_BUILT_IN_FETCH_AND_ADD_1;
+    case BUILT_IN_FETCH_AND_ADD_2: return GSBI_BUILT_IN_FETCH_AND_ADD_2;
+    case BUILT_IN_FETCH_AND_ADD_4: return GSBI_BUILT_IN_FETCH_AND_ADD_4;
+    case BUILT_IN_FETCH_AND_ADD_8: return GSBI_BUILT_IN_FETCH_AND_ADD_8;
+    case BUILT_IN_FETCH_AND_ADD_16: return GSBI_BUILT_IN_FETCH_AND_ADD_16;
+    case BUILT_IN_FETCH_AND_SUB_N: return GSBI_BUILT_IN_FETCH_AND_SUB_N;
+    case BUILT_IN_FETCH_AND_SUB_1: return GSBI_BUILT_IN_FETCH_AND_SUB_1;
+    case BUILT_IN_FETCH_AND_SUB_2: return GSBI_BUILT_IN_FETCH_AND_SUB_2;
+    case BUILT_IN_FETCH_AND_SUB_4: return GSBI_BUILT_IN_FETCH_AND_SUB_4;
+    case BUILT_IN_FETCH_AND_SUB_8: return GSBI_BUILT_IN_FETCH_AND_SUB_8;
+    case BUILT_IN_FETCH_AND_SUB_16: return GSBI_BUILT_IN_FETCH_AND_SUB_16;
+    case BUILT_IN_FETCH_AND_OR_N: return GSBI_BUILT_IN_FETCH_AND_OR_N;
+    case BUILT_IN_FETCH_AND_OR_1: return GSBI_BUILT_IN_FETCH_AND_OR_1;
+    case BUILT_IN_FETCH_AND_OR_2: return GSBI_BUILT_IN_FETCH_AND_OR_2;
+    case BUILT_IN_FETCH_AND_OR_4: return GSBI_BUILT_IN_FETCH_AND_OR_4;
+    case BUILT_IN_FETCH_AND_OR_8: return GSBI_BUILT_IN_FETCH_AND_OR_8;
+    case BUILT_IN_FETCH_AND_OR_16: return GSBI_BUILT_IN_FETCH_AND_OR_16;
+    case BUILT_IN_FETCH_AND_AND_N: return GSBI_BUILT_IN_FETCH_AND_AND_N;
+    case BUILT_IN_FETCH_AND_AND_1: return GSBI_BUILT_IN_FETCH_AND_AND_1;
+    case BUILT_IN_FETCH_AND_AND_2: return GSBI_BUILT_IN_FETCH_AND_AND_2;
+    case BUILT_IN_FETCH_AND_AND_4: return GSBI_BUILT_IN_FETCH_AND_AND_4;
+    case BUILT_IN_FETCH_AND_AND_8: return GSBI_BUILT_IN_FETCH_AND_AND_8;
+    case BUILT_IN_FETCH_AND_AND_16: return GSBI_BUILT_IN_FETCH_AND_AND_16;
+    case BUILT_IN_FETCH_AND_XOR_N: return GSBI_BUILT_IN_FETCH_AND_XOR_N;
+    case BUILT_IN_FETCH_AND_XOR_1: return GSBI_BUILT_IN_FETCH_AND_XOR_1;
+    case BUILT_IN_FETCH_AND_XOR_2: return GSBI_BUILT_IN_FETCH_AND_XOR_2;
+    case BUILT_IN_FETCH_AND_XOR_4: return GSBI_BUILT_IN_FETCH_AND_XOR_4;
+    case BUILT_IN_FETCH_AND_XOR_8: return GSBI_BUILT_IN_FETCH_AND_XOR_8;
+    case BUILT_IN_FETCH_AND_XOR_16: return GSBI_BUILT_IN_FETCH_AND_XOR_16;
+    case BUILT_IN_FETCH_AND_NAND_N: return GSBI_BUILT_IN_FETCH_AND_NAND_N;
+    case BUILT_IN_FETCH_AND_NAND_1: return GSBI_BUILT_IN_FETCH_AND_NAND_1;
+    case BUILT_IN_FETCH_AND_NAND_2: return GSBI_BUILT_IN_FETCH_AND_NAND_2;
+    case BUILT_IN_FETCH_AND_NAND_4: return GSBI_BUILT_IN_FETCH_AND_NAND_4;
+    case BUILT_IN_FETCH_AND_NAND_8: return GSBI_BUILT_IN_FETCH_AND_NAND_8;
+    case BUILT_IN_FETCH_AND_NAND_16: return GSBI_BUILT_IN_FETCH_AND_NAND_16;
+    case BUILT_IN_ADD_AND_FETCH_N: return GSBI_BUILT_IN_ADD_AND_FETCH_N;
+    case BUILT_IN_ADD_AND_FETCH_1: return GSBI_BUILT_IN_ADD_AND_FETCH_1;
+    case BUILT_IN_ADD_AND_FETCH_2: return GSBI_BUILT_IN_ADD_AND_FETCH_2;
+    case BUILT_IN_ADD_AND_FETCH_4: return GSBI_BUILT_IN_ADD_AND_FETCH_4;
+    case BUILT_IN_ADD_AND_FETCH_8: return GSBI_BUILT_IN_ADD_AND_FETCH_8;
+    case BUILT_IN_ADD_AND_FETCH_16: return GSBI_BUILT_IN_ADD_AND_FETCH_16;
+    case BUILT_IN_SUB_AND_FETCH_N: return GSBI_BUILT_IN_SUB_AND_FETCH_N;
+    case BUILT_IN_SUB_AND_FETCH_1: return GSBI_BUILT_IN_SUB_AND_FETCH_1;
+    case BUILT_IN_SUB_AND_FETCH_2: return GSBI_BUILT_IN_SUB_AND_FETCH_2;
+    case BUILT_IN_SUB_AND_FETCH_4: return GSBI_BUILT_IN_SUB_AND_FETCH_4;
+    case BUILT_IN_SUB_AND_FETCH_8: return GSBI_BUILT_IN_SUB_AND_FETCH_8;
+    case BUILT_IN_SUB_AND_FETCH_16: return GSBI_BUILT_IN_SUB_AND_FETCH_16;
+    case BUILT_IN_OR_AND_FETCH_N: return GSBI_BUILT_IN_OR_AND_FETCH_N;
+    case BUILT_IN_OR_AND_FETCH_1: return GSBI_BUILT_IN_OR_AND_FETCH_1;
+    case BUILT_IN_OR_AND_FETCH_2: return GSBI_BUILT_IN_OR_AND_FETCH_2;
+    case BUILT_IN_OR_AND_FETCH_4: return GSBI_BUILT_IN_OR_AND_FETCH_4;
+    case BUILT_IN_OR_AND_FETCH_8: return GSBI_BUILT_IN_OR_AND_FETCH_8;
+    case BUILT_IN_OR_AND_FETCH_16: return GSBI_BUILT_IN_OR_AND_FETCH_16;
+    case BUILT_IN_AND_AND_FETCH_N: return GSBI_BUILT_IN_AND_AND_FETCH_N;
+    case BUILT_IN_AND_AND_FETCH_1: return GSBI_BUILT_IN_AND_AND_FETCH_1;
+    case BUILT_IN_AND_AND_FETCH_2: return GSBI_BUILT_IN_AND_AND_FETCH_2;
+    case BUILT_IN_AND_AND_FETCH_4: return GSBI_BUILT_IN_AND_AND_FETCH_4;
+    case BUILT_IN_AND_AND_FETCH_8: return GSBI_BUILT_IN_AND_AND_FETCH_8;
+    case BUILT_IN_AND_AND_FETCH_16: return GSBI_BUILT_IN_AND_AND_FETCH_16;
+    case BUILT_IN_XOR_AND_FETCH_N: return GSBI_BUILT_IN_XOR_AND_FETCH_N;
+    case BUILT_IN_XOR_AND_FETCH_1: return GSBI_BUILT_IN_XOR_AND_FETCH_1;
+    case BUILT_IN_XOR_AND_FETCH_2: return GSBI_BUILT_IN_XOR_AND_FETCH_2;
+    case BUILT_IN_XOR_AND_FETCH_4: return GSBI_BUILT_IN_XOR_AND_FETCH_4;
+    case BUILT_IN_XOR_AND_FETCH_8: return GSBI_BUILT_IN_XOR_AND_FETCH_8;
+    case BUILT_IN_XOR_AND_FETCH_16: return GSBI_BUILT_IN_XOR_AND_FETCH_16;
+    case BUILT_IN_NAND_AND_FETCH_N: return GSBI_BUILT_IN_NAND_AND_FETCH_N;
+    case BUILT_IN_NAND_AND_FETCH_1: return GSBI_BUILT_IN_NAND_AND_FETCH_1;
+    case BUILT_IN_NAND_AND_FETCH_2: return GSBI_BUILT_IN_NAND_AND_FETCH_2;
+    case BUILT_IN_NAND_AND_FETCH_4: return GSBI_BUILT_IN_NAND_AND_FETCH_4;
+    case BUILT_IN_NAND_AND_FETCH_8: return GSBI_BUILT_IN_NAND_AND_FETCH_8;
+    case BUILT_IN_NAND_AND_FETCH_16: return GSBI_BUILT_IN_NAND_AND_FETCH_16;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_N: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_N;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_1: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_1;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_2: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_2;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_4: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_4;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_8: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_8;
+    case BUILT_IN_BOOL_COMPARE_AND_SWAP_16: return GSBI_BUILT_IN_BOOL_COMPARE_AND_SWAP_16;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_N: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_N;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_1: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_1;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_2: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_2;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_4: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_4;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_8: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_8;
+    case BUILT_IN_VAL_COMPARE_AND_SWAP_16: return GSBI_BUILT_IN_VAL_COMPARE_AND_SWAP_16;
+    case BUILT_IN_LOCK_TEST_AND_SET_N: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_N;
+    case BUILT_IN_LOCK_TEST_AND_SET_1: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_1;
+    case BUILT_IN_LOCK_TEST_AND_SET_2: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_2;
+    case BUILT_IN_LOCK_TEST_AND_SET_4: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_4;
+    case BUILT_IN_LOCK_TEST_AND_SET_8: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_8;
+    case BUILT_IN_LOCK_TEST_AND_SET_16: return GSBI_BUILT_IN_LOCK_TEST_AND_SET_16;
+    case BUILT_IN_LOCK_RELEASE_N: return GSBI_BUILT_IN_LOCK_RELEASE_N;
+    case BUILT_IN_LOCK_RELEASE_1: return GSBI_BUILT_IN_LOCK_RELEASE_1;
+    case BUILT_IN_LOCK_RELEASE_2: return GSBI_BUILT_IN_LOCK_RELEASE_2;
+    case BUILT_IN_LOCK_RELEASE_4: return GSBI_BUILT_IN_LOCK_RELEASE_4;
+    case BUILT_IN_LOCK_RELEASE_8: return GSBI_BUILT_IN_LOCK_RELEASE_8;
+    case BUILT_IN_LOCK_RELEASE_16: return GSBI_BUILT_IN_LOCK_RELEASE_16;
+    case BUILT_IN_SYNCHRONIZE: return GSBI_BUILT_IN_SYNCHRONIZE;
+    case BUILT_IN_OMP_GET_THREAD_NUM: return GSBI_BUILT_IN_OMP_GET_THREAD_NUM;
+    case BUILT_IN_OMP_GET_NUM_THREADS: return GSBI_BUILT_IN_OMP_GET_NUM_THREADS;
+    case BUILT_IN_GOMP_ATOMIC_START: return GSBI_BUILT_IN_GOMP_ATOMIC_START;
+    case BUILT_IN_GOMP_ATOMIC_END: return GSBI_BUILT_IN_GOMP_ATOMIC_END;
+    case BUILT_IN_GOMP_BARRIER: return GSBI_BUILT_IN_GOMP_BARRIER;
+    case BUILT_IN_GOMP_CRITICAL_START: return GSBI_BUILT_IN_GOMP_CRITICAL_START;
+    case BUILT_IN_GOMP_CRITICAL_END: return GSBI_BUILT_IN_GOMP_CRITICAL_END;
+    case BUILT_IN_GOMP_CRITICAL_NAME_START: return GSBI_BUILT_IN_GOMP_CRITICAL_NAME_START;
+    case BUILT_IN_GOMP_CRITICAL_NAME_END: return GSBI_BUILT_IN_GOMP_CRITICAL_NAME_END;
+    case BUILT_IN_GOMP_LOOP_STATIC_START: return GSBI_BUILT_IN_GOMP_LOOP_STATIC_START;
+    case BUILT_IN_GOMP_LOOP_DYNAMIC_START: return GSBI_BUILT_IN_GOMP_LOOP_DYNAMIC_START;
+    case BUILT_IN_GOMP_LOOP_GUIDED_START: return GSBI_BUILT_IN_GOMP_LOOP_GUIDED_START;
+    case BUILT_IN_GOMP_LOOP_RUNTIME_START: return GSBI_BUILT_IN_GOMP_LOOP_RUNTIME_START;
+    case BUILT_IN_GOMP_LOOP_ORDERED_STATIC_START: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_STATIC_START;
+    case BUILT_IN_GOMP_LOOP_ORDERED_DYNAMIC_START: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_DYNAMIC_START;
+    case BUILT_IN_GOMP_LOOP_ORDERED_GUIDED_START: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_GUIDED_START;
+    case BUILT_IN_GOMP_LOOP_ORDERED_RUNTIME_START: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_RUNTIME_START;
+    case BUILT_IN_GOMP_LOOP_STATIC_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_STATIC_NEXT;
+    case BUILT_IN_GOMP_LOOP_DYNAMIC_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_DYNAMIC_NEXT;
+    case BUILT_IN_GOMP_LOOP_GUIDED_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_GUIDED_NEXT;
+    case BUILT_IN_GOMP_LOOP_RUNTIME_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_RUNTIME_NEXT;
+    case BUILT_IN_GOMP_LOOP_ORDERED_STATIC_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_STATIC_NEXT;
+    case BUILT_IN_GOMP_LOOP_ORDERED_DYNAMIC_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_DYNAMIC_NEXT;
+    case BUILT_IN_GOMP_LOOP_ORDERED_GUIDED_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_GUIDED_NEXT;
+    case BUILT_IN_GOMP_LOOP_ORDERED_RUNTIME_NEXT: return GSBI_BUILT_IN_GOMP_LOOP_ORDERED_RUNTIME_NEXT;
+    case BUILT_IN_GOMP_PARALLEL_LOOP_STATIC_START: return GSBI_BUILT_IN_GOMP_PARALLEL_LOOP_STATIC_START;
+    case BUILT_IN_GOMP_PARALLEL_LOOP_DYNAMIC_START: return GSBI_BUILT_IN_GOMP_PARALLEL_LOOP_DYNAMIC_START;
+    case BUILT_IN_GOMP_PARALLEL_LOOP_GUIDED_START: return GSBI_BUILT_IN_GOMP_PARALLEL_LOOP_GUIDED_START;
+    case BUILT_IN_GOMP_PARALLEL_LOOP_RUNTIME_START: return GSBI_BUILT_IN_GOMP_PARALLEL_LOOP_RUNTIME_START;
+    case BUILT_IN_GOMP_LOOP_END: return GSBI_BUILT_IN_GOMP_LOOP_END;
+    case BUILT_IN_GOMP_LOOP_END_NOWAIT: return GSBI_BUILT_IN_GOMP_LOOP_END_NOWAIT;
+    case BUILT_IN_GOMP_ORDERED_START: return GSBI_BUILT_IN_GOMP_ORDERED_START;
+    case BUILT_IN_GOMP_ORDERED_END: return GSBI_BUILT_IN_GOMP_ORDERED_END;
+    case BUILT_IN_GOMP_PARALLEL_START: return GSBI_BUILT_IN_GOMP_PARALLEL_START;
+    case BUILT_IN_GOMP_PARALLEL_END: return GSBI_BUILT_IN_GOMP_PARALLEL_END;
+    case BUILT_IN_GOMP_SECTIONS_START: return GSBI_BUILT_IN_GOMP_SECTIONS_START;
+    case BUILT_IN_GOMP_SECTIONS_NEXT: return GSBI_BUILT_IN_GOMP_SECTIONS_NEXT;
+    case BUILT_IN_GOMP_PARALLEL_SECTIONS_START: return GSBI_BUILT_IN_GOMP_PARALLEL_SECTIONS_START;
+    case BUILT_IN_GOMP_SECTIONS_END: return GSBI_BUILT_IN_GOMP_SECTIONS_END;
+    case BUILT_IN_GOMP_SECTIONS_END_NOWAIT: return GSBI_BUILT_IN_GOMP_SECTIONS_END_NOWAIT;
+    case BUILT_IN_GOMP_SINGLE_START: return GSBI_BUILT_IN_GOMP_SINGLE_START;
+    case BUILT_IN_GOMP_SINGLE_COPY_START: return GSBI_BUILT_IN_GOMP_SINGLE_COPY_START;
+    case BUILT_IN_GOMP_SINGLE_COPY_END: return GSBI_BUILT_IN_GOMP_SINGLE_COPY_END;
+#endif
+
+    case BUILT_IN_COMPLEX_MUL_MIN: return GSBI_BUILT_IN_COMPLEX_MUL_MIN;
+    case BUILT_IN_COMPLEX_MUL_MAX: return GSBI_BUILT_IN_COMPLEX_MUL_MAX;
+    case BUILT_IN_COMPLEX_DIV_MIN: return GSBI_BUILT_IN_COMPLEX_DIV_MIN;
+    case BUILT_IN_COMPLEX_DIV_MAX: return GSBI_BUILT_IN_COMPLEX_DIV_MAX;
+#ifdef TARG_SL
+    case BUILT_IN_CVT64_HIGH:          return GSBI_BUILT_IN_CVT64_HIGH;
+    case BUILT_IN_CVT64_LOW:           return GSBI_BUILT_IN_CVT64_LOW;
+    case BUILT_IN_CVT32:               return GSBI_BUILT_IN_CVT32;
+    case BUILT_IN_LONGLONG_CVT64_HIGH: return GSBI_BUILT_IN_LONGLONG_CVT64_HIGH;
+    case BUILT_IN_LONGLONG_CVT64_LOW:  return GSBI_BUILT_IN_LONGLONG_CVT64_LOW;
+    case BUILT_IN_C3AADDA:  return GSBI_BUILT_IN_C3AADDA;
+    case BUILT_IN_C3NEGA:   return GSBI_BUILT_IN_C3NEGA;
+    case BUILT_IN_C3BITR:   return GSBI_BUILT_IN_C3BITR;
+    case BUILT_IN_C3CS:     return GSBI_BUILT_IN_C3CS;
+    case BUILT_IN_C3DADD:   return GSBI_BUILT_IN_C3DADD;
+    case BUILT_IN_C3DMAC:   return GSBI_BUILT_IN_C3DMAC;
+    case BUILT_IN_C3DMACA:  return GSBI_BUILT_IN_C3DMACA;
+    case BUILT_IN_C3DMULA:  return GSBI_BUILT_IN_C3DMULA;
+    case BUILT_IN_C3DMULAA: return GSBI_BUILT_IN_C3DMULAA;
+    case BUILT_IN_C3DSHLLI: return GSBI_BUILT_IN_C3DSHLLI;
+    case BUILT_IN_C3FFE:    return GSBI_BUILT_IN_C3FFE;
+    case BUILT_IN_C3LD:     return GSBI_BUILT_IN_C3LD;
+    case BUILT_IN_C3ST:     return GSBI_BUILT_IN_C3ST;
+    case BUILT_IN_C3LEAD:   return GSBI_BUILT_IN_C3LEAD;
+    case BUILT_IN_C3MAC:    return GSBI_BUILT_IN_C3MAC;
+    case BUILT_IN_C3MACA:   return GSBI_BUILT_IN_C3MACA;
+    case BUILT_IN_C3MACAR:  return GSBI_BUILT_IN_C3MACAR;
+    case BUILT_IN_C3MACI:   return GSBI_BUILT_IN_C3MACI;
+    case BUILT_IN_C3MULA:   return GSBI_BUILT_IN_C3MULA;
+    case BUILT_IN_C3MULAA:  return GSBI_BUILT_IN_C3MULAA;
+    case BUILT_IN_C3MULAAR: return GSBI_BUILT_IN_C3MULAAR;
+    case BUILT_IN_C3MULAI:  return GSBI_BUILT_IN_C3MULAI;
+    case BUILT_IN_C3MULS:   return GSBI_BUILT_IN_C3MULS;
+    case BUILT_IN_C3MULUS:  return GSBI_BUILT_IN_C3MULUS;
+    case BUILT_IN_C3REVB:   return GSBI_BUILT_IN_C3REVB;
+    case BUILT_IN_C3ROUND:  return GSBI_BUILT_IN_C3ROUND;
+    case BUILT_IN_C3SAADDA: return GSBI_BUILT_IN_C3SAADDA;
+    case BUILT_IN_C3SAADDHA: return GSBI_BUILT_IN_C3SAADDHA;
+    case BUILT_IN_C3SAADDS:  return GSBI_BUILT_IN_C3SAADDS;
+    case BUILT_IN_C3SAADDSH: return GSBI_BUILT_IN_C3SAADDSH;
+    case BUILT_IN_C3SADDA:   return GSBI_BUILT_IN_C3SADDA;
+    case BUILT_IN_C3SADDAA:  return GSBI_BUILT_IN_C3SADDAA;
+    case BUILT_IN_C3SAMULHA: return GSBI_BUILT_IN_C3SAMULHA;
+    case BUILT_IN_C3SAMULSH: return GSBI_BUILT_IN_C3SAMULSH;
+    case BUILT_IN_C3SHAV:    return GSBI_BUILT_IN_C3SHAV;
+    case BUILT_IN_C3SHLAFAI: return GSBI_BUILT_IN_C3SHLAFAI;
+    case BUILT_IN_C3SHLATAI: return GSBI_BUILT_IN_C3SHLATAI;
+    case BUILT_IN_C3SHLAI:   return GSBI_BUILT_IN_C3SHLAI;
+    case BUILT_IN_C3SUBC:    return GSBI_BUILT_IN_C3SUBC;
+    case BUILT_IN_INIT_HI:   return GSBI_BUILT_IN_INIT_HI;
+    case BUILT_IN_COPY_HI:   return GSBI_BUILT_IN_COPY_HI;
+    case BUILT_IN_C3_INIT_ACC: return GSBI_BUILT_IN_C3_INIT_ACC;
+    case BUILT_IN_C3_SAVE_ACC: return GSBI_BUILT_IN_C3_SAVE_ACC;
+    case BUILT_IN_C3_INIT_DACC: return GSBI_BUILT_IN_C3_INIT_DACC;
+    case BUILT_IN_C3_SAVE_DACC: return GSBI_BUILT_IN_C3_SAVE_DACC;
+    case BUILT_IN_C3_INIT_ADDR: return GSBI_BUILT_IN_C3_INIT_ADDR;
+    case BUILT_IN_C3_SAVE_ADDR: return GSBI_BUILT_IN_C3_SAVE_ADDR;
+    case BUILT_IN_C3_MVFS:      return GSBI_BUILT_IN_C3_MVFS;
+    case BUILT_IN_SET_ADDR:     return GSBI_BUILT_IN_SET_ADDR;
+    case BUILT_IN_SET_CIRCBUF:  return GSBI_BUILT_IN_SET_CIRCBUF;
+#endif
+    case END_BUILTINS: return GSBI_END_BUILTINS;
+  }
+  gcc_assert (0);
+  return (gsbi_t) GSBI_END_BUILTINS;
+}
+
+static inline gsbi_class_t
+gcc_built_in_class2gsbi_class (unsigned char class) 
+{
+ switch (class) {
+   case 0: return GSBI_CLASS_NOT_BUILT_IN;
+   case 1: return GSBI_CLASS_BUILT_IN_FRONTEND;
+   case 2: return GSBI_CLASS_BUILT_IN_MD;
+   case 3: return GSBI_CLASS_BUILT_IN_NORMAL;
+ }
+ gcc_assert (0);
+ return (gsbi_class_t) 0;
+}
+
+#ifdef TARG_X8664
+static inline gsbi_ts_t
+ix86_builtins2gsbi_ts (enum ix86_builtins code) 
+{
+  switch (code) {
+    case IX86_BUILTIN_ADDPS: return GSBI_IX86_BUILTIN_ADDPS;
+    case IX86_BUILTIN_ADDSS: return GSBI_IX86_BUILTIN_ADDSS;
+    case IX86_BUILTIN_DIVPS: return GSBI_IX86_BUILTIN_DIVPS;
+    case IX86_BUILTIN_DIVSS: return GSBI_IX86_BUILTIN_DIVSS;
+    case IX86_BUILTIN_MULPS: return GSBI_IX86_BUILTIN_MULPS;
+    case IX86_BUILTIN_MULSS: return GSBI_IX86_BUILTIN_MULSS;
+    case IX86_BUILTIN_SUBPS: return GSBI_IX86_BUILTIN_SUBPS;
+    case IX86_BUILTIN_SUBSS: return GSBI_IX86_BUILTIN_SUBSS;
+    case IX86_BUILTIN_CMPEQPS: return GSBI_IX86_BUILTIN_CMPEQPS;
+    case IX86_BUILTIN_CMPLTPS: return GSBI_IX86_BUILTIN_CMPLTPS;
+    case IX86_BUILTIN_CMPLEPS: return GSBI_IX86_BUILTIN_CMPLEPS;
+    case IX86_BUILTIN_CMPGTPS: return GSBI_IX86_BUILTIN_CMPGTPS;
+    case IX86_BUILTIN_CMPGEPS: return GSBI_IX86_BUILTIN_CMPGEPS;
+    case IX86_BUILTIN_CMPNEQPS: return GSBI_IX86_BUILTIN_CMPNEQPS;
+    case IX86_BUILTIN_CMPNLTPS: return GSBI_IX86_BUILTIN_CMPNLTPS;
+    case IX86_BUILTIN_CMPNLEPS: return GSBI_IX86_BUILTIN_CMPNLEPS;
+    case IX86_BUILTIN_CMPNGTPS: return GSBI_IX86_BUILTIN_CMPNGTPS;
+    case IX86_BUILTIN_CMPNGEPS: return GSBI_IX86_BUILTIN_CMPNGEPS;
+    case IX86_BUILTIN_CMPORDPS: return GSBI_IX86_BUILTIN_CMPORDPS;
+    case IX86_BUILTIN_CMPUNORDPS: return GSBI_IX86_BUILTIN_CMPUNORDPS;
+    case IX86_BUILTIN_CMPEQSS: return GSBI_IX86_BUILTIN_CMPEQSS;
+    case IX86_BUILTIN_CMPLTSS: return GSBI_IX86_BUILTIN_CMPLTSS;
+    case IX86_BUILTIN_CMPLESS: return GSBI_IX86_BUILTIN_CMPLESS;
+    case IX86_BUILTIN_CMPNEQSS: return GSBI_IX86_BUILTIN_CMPNEQSS;
+    case IX86_BUILTIN_CMPNLTSS: return GSBI_IX86_BUILTIN_CMPNLTSS;
+    case IX86_BUILTIN_CMPNLESS: return GSBI_IX86_BUILTIN_CMPNLESS;
+    case IX86_BUILTIN_CMPNGTSS: return GSBI_IX86_BUILTIN_CMPNGTSS;
+    case IX86_BUILTIN_CMPNGESS: return GSBI_IX86_BUILTIN_CMPNGESS;
+    case IX86_BUILTIN_CMPORDSS: return GSBI_IX86_BUILTIN_CMPORDSS;
+    case IX86_BUILTIN_CMPUNORDSS: return GSBI_IX86_BUILTIN_CMPUNORDSS;
+    case IX86_BUILTIN_COMIEQSS: return GSBI_IX86_BUILTIN_COMIEQSS;
+    case IX86_BUILTIN_COMILTSS: return GSBI_IX86_BUILTIN_COMILTSS;
+    case IX86_BUILTIN_COMILESS: return GSBI_IX86_BUILTIN_COMILESS;
+    case IX86_BUILTIN_COMIGTSS: return GSBI_IX86_BUILTIN_COMIGTSS;
+    case IX86_BUILTIN_COMIGESS: return GSBI_IX86_BUILTIN_COMIGESS;
+    case IX86_BUILTIN_COMINEQSS: return GSBI_IX86_BUILTIN_COMINEQSS;
+    case IX86_BUILTIN_UCOMIEQSS: return GSBI_IX86_BUILTIN_UCOMIEQSS;
+    case IX86_BUILTIN_UCOMILTSS: return GSBI_IX86_BUILTIN_UCOMILTSS;
+    case IX86_BUILTIN_UCOMILESS: return GSBI_IX86_BUILTIN_UCOMILESS;
+    case IX86_BUILTIN_UCOMIGTSS: return GSBI_IX86_BUILTIN_UCOMIGTSS;
+    case IX86_BUILTIN_UCOMIGESS: return GSBI_IX86_BUILTIN_UCOMIGESS;
+    case IX86_BUILTIN_UCOMINEQSS: return GSBI_IX86_BUILTIN_UCOMINEQSS;
+    case IX86_BUILTIN_CVTPI2PS: return GSBI_IX86_BUILTIN_CVTPI2PS;
+    case IX86_BUILTIN_CVTPS2PI: return GSBI_IX86_BUILTIN_CVTPS2PI;
+    case IX86_BUILTIN_CVTSI2SS: return GSBI_IX86_BUILTIN_CVTSI2SS;
+    case IX86_BUILTIN_CVTSI642SS: return GSBI_IX86_BUILTIN_CVTSI642SS;
+    case IX86_BUILTIN_CVTSS2SI: return GSBI_IX86_BUILTIN_CVTSS2SI;
+    case IX86_BUILTIN_CVTSS2SI64: return GSBI_IX86_BUILTIN_CVTSS2SI64;
+    case IX86_BUILTIN_CVTTPS2PI: return GSBI_IX86_BUILTIN_CVTTPS2PI;
+    case IX86_BUILTIN_CVTTSS2SI: return GSBI_IX86_BUILTIN_CVTTSS2SI;
+    case IX86_BUILTIN_CVTTSS2SI64: return GSBI_IX86_BUILTIN_CVTTSS2SI64;
+    case IX86_BUILTIN_MAXPS: return GSBI_IX86_BUILTIN_MAXPS;
+    case IX86_BUILTIN_MAXSS: return GSBI_IX86_BUILTIN_MAXSS;
+    case IX86_BUILTIN_MINPS: return GSBI_IX86_BUILTIN_MINPS;
+    case IX86_BUILTIN_MINSS: return GSBI_IX86_BUILTIN_MINSS;
+    case IX86_BUILTIN_LOADUPS: return GSBI_IX86_BUILTIN_LOADUPS;
+    case IX86_BUILTIN_STOREUPS: return GSBI_IX86_BUILTIN_STOREUPS;
+    case IX86_BUILTIN_MOVSS: return GSBI_IX86_BUILTIN_MOVSS;
+    case IX86_BUILTIN_MOVHLPS: return GSBI_IX86_BUILTIN_MOVHLPS;
+    case IX86_BUILTIN_MOVLHPS: return GSBI_IX86_BUILTIN_MOVLHPS;
+    case IX86_BUILTIN_LOADHPS: return GSBI_IX86_BUILTIN_LOADHPS;
+    case IX86_BUILTIN_LOADLPS: return GSBI_IX86_BUILTIN_LOADLPS;
+    case IX86_BUILTIN_STOREHPS: return GSBI_IX86_BUILTIN_STOREHPS;
+    case IX86_BUILTIN_STORELPS: return GSBI_IX86_BUILTIN_STORELPS;
+    case IX86_BUILTIN_MASKMOVQ: return GSBI_IX86_BUILTIN_MASKMOVQ;
+    case IX86_BUILTIN_MOVMSKPS: return GSBI_IX86_BUILTIN_MOVMSKPS;
+    case IX86_BUILTIN_PMOVMSKB: return GSBI_IX86_BUILTIN_PMOVMSKB;
+    case IX86_BUILTIN_MOVNTPS: return GSBI_IX86_BUILTIN_MOVNTPS;
+    case IX86_BUILTIN_MOVNTQ: return GSBI_IX86_BUILTIN_MOVNTQ;
+    case IX86_BUILTIN_LOADDQU: return GSBI_IX86_BUILTIN_LOADDQU;
+    case IX86_BUILTIN_STOREDQU: return GSBI_IX86_BUILTIN_STOREDQU;
+    case IX86_BUILTIN_PACKSSWB: return GSBI_IX86_BUILTIN_PACKSSWB;
+    case IX86_BUILTIN_PACKSSDW: return GSBI_IX86_BUILTIN_PACKSSDW;
+    case IX86_BUILTIN_PACKUSWB: return GSBI_IX86_BUILTIN_PACKUSWB;
+    case IX86_BUILTIN_PADDB: return GSBI_IX86_BUILTIN_PADDB;
+    case IX86_BUILTIN_PADDW: return GSBI_IX86_BUILTIN_PADDW;
+    case IX86_BUILTIN_PADDD: return GSBI_IX86_BUILTIN_PADDD;
+    case IX86_BUILTIN_PADDQ: return GSBI_IX86_BUILTIN_PADDQ;
+    case IX86_BUILTIN_PADDSB: return GSBI_IX86_BUILTIN_PADDSB;
+    case IX86_BUILTIN_PADDSW: return GSBI_IX86_BUILTIN_PADDSW;
+    case IX86_BUILTIN_PADDUSB: return GSBI_IX86_BUILTIN_PADDUSB;
+    case IX86_BUILTIN_PADDUSW: return GSBI_IX86_BUILTIN_PADDUSW;
+    case IX86_BUILTIN_PSUBB: return GSBI_IX86_BUILTIN_PSUBB;
+    case IX86_BUILTIN_PSUBW: return GSBI_IX86_BUILTIN_PSUBW;
+    case IX86_BUILTIN_PSUBD: return GSBI_IX86_BUILTIN_PSUBD;
+    case IX86_BUILTIN_PSUBQ: return GSBI_IX86_BUILTIN_PSUBQ;
+    case IX86_BUILTIN_PSUBSB: return GSBI_IX86_BUILTIN_PSUBSB;
+    case IX86_BUILTIN_PSUBSW: return GSBI_IX86_BUILTIN_PSUBSW;
+    case IX86_BUILTIN_PSUBUSB: return GSBI_IX86_BUILTIN_PSUBUSB;
+    case IX86_BUILTIN_PSUBUSW: return GSBI_IX86_BUILTIN_PSUBUSW;
+    case IX86_BUILTIN_PAND: return GSBI_IX86_BUILTIN_PAND;
+    case IX86_BUILTIN_PANDN: return GSBI_IX86_BUILTIN_PANDN;
+    case IX86_BUILTIN_POR: return GSBI_IX86_BUILTIN_POR;
+    case IX86_BUILTIN_PXOR: return GSBI_IX86_BUILTIN_PXOR;
+    case IX86_BUILTIN_PAVGB: return GSBI_IX86_BUILTIN_PAVGB;
+    case IX86_BUILTIN_PAVGW: return GSBI_IX86_BUILTIN_PAVGW;
+    case IX86_BUILTIN_PCMPEQB: return GSBI_IX86_BUILTIN_PCMPEQB;
+    case IX86_BUILTIN_PCMPEQW: return GSBI_IX86_BUILTIN_PCMPEQW;
+    case IX86_BUILTIN_PCMPEQD: return GSBI_IX86_BUILTIN_PCMPEQD;
+    case IX86_BUILTIN_PCMPGTB: return GSBI_IX86_BUILTIN_PCMPGTB;
+    case IX86_BUILTIN_PCMPGTW: return GSBI_IX86_BUILTIN_PCMPGTW;
+    case IX86_BUILTIN_PCMPGTD: return GSBI_IX86_BUILTIN_PCMPGTD;
+    case IX86_BUILTIN_PMADDWD: return GSBI_IX86_BUILTIN_PMADDWD;
+    case IX86_BUILTIN_PMAXSW: return GSBI_IX86_BUILTIN_PMAXSW;
+    case IX86_BUILTIN_PMAXUB: return GSBI_IX86_BUILTIN_PMAXUB;
+    case IX86_BUILTIN_PMINSW: return GSBI_IX86_BUILTIN_PMINSW;
+    case IX86_BUILTIN_PMINUB: return GSBI_IX86_BUILTIN_PMINUB;
+    case IX86_BUILTIN_PMULHUW: return GSBI_IX86_BUILTIN_PMULHUW;
+    case IX86_BUILTIN_PMULHW: return GSBI_IX86_BUILTIN_PMULHW;
+    case IX86_BUILTIN_PMULLW: return GSBI_IX86_BUILTIN_PMULLW;
+    case IX86_BUILTIN_PSADBW: return GSBI_IX86_BUILTIN_PSADBW;
+    case IX86_BUILTIN_PSHUFW: return GSBI_IX86_BUILTIN_PSHUFW;
+    case IX86_BUILTIN_PSLLW: return GSBI_IX86_BUILTIN_PSLLW;
+    case IX86_BUILTIN_PSLLD: return GSBI_IX86_BUILTIN_PSLLD;
+    case IX86_BUILTIN_PSLLQ: return GSBI_IX86_BUILTIN_PSLLQ;
+    case IX86_BUILTIN_PSRAW: return GSBI_IX86_BUILTIN_PSRAW;
+    case IX86_BUILTIN_PSRAD: return GSBI_IX86_BUILTIN_PSRAD;
+    case IX86_BUILTIN_PSRLW: return GSBI_IX86_BUILTIN_PSRLW;
+    case IX86_BUILTIN_PSRLD: return GSBI_IX86_BUILTIN_PSRLD;
+    case IX86_BUILTIN_PSRLQ: return GSBI_IX86_BUILTIN_PSRLQ;
+    case IX86_BUILTIN_PSLLWI: return GSBI_IX86_BUILTIN_PSLLWI;
+    case IX86_BUILTIN_PSLLDI: return GSBI_IX86_BUILTIN_PSLLDI;
+    case IX86_BUILTIN_PSLLQI: return GSBI_IX86_BUILTIN_PSLLQI;
+    case IX86_BUILTIN_PSRAWI: return GSBI_IX86_BUILTIN_PSRAWI;
+    case IX86_BUILTIN_PSRADI: return GSBI_IX86_BUILTIN_PSRADI;
+    case IX86_BUILTIN_PSRLWI: return GSBI_IX86_BUILTIN_PSRLWI;
+    case IX86_BUILTIN_PSRLDI: return GSBI_IX86_BUILTIN_PSRLDI;
+    case IX86_BUILTIN_PSRLQI: return GSBI_IX86_BUILTIN_PSRLQI;
+    case IX86_BUILTIN_PUNPCKHBW: return GSBI_IX86_BUILTIN_PUNPCKHBW;
+    case IX86_BUILTIN_PUNPCKHWD: return GSBI_IX86_BUILTIN_PUNPCKHWD;
+    case IX86_BUILTIN_PUNPCKHDQ: return GSBI_IX86_BUILTIN_PUNPCKHDQ;
+    case IX86_BUILTIN_PUNPCKLBW: return GSBI_IX86_BUILTIN_PUNPCKLBW;
+    case IX86_BUILTIN_PUNPCKLWD: return GSBI_IX86_BUILTIN_PUNPCKLWD;
+    case IX86_BUILTIN_PUNPCKLDQ: return GSBI_IX86_BUILTIN_PUNPCKLDQ;
+    case IX86_BUILTIN_SHUFPS: return GSBI_IX86_BUILTIN_SHUFPS;
+    case IX86_BUILTIN_RCPPS: return GSBI_IX86_BUILTIN_RCPPS;
+    case IX86_BUILTIN_RCPSS: return GSBI_IX86_BUILTIN_RCPSS;
+    case IX86_BUILTIN_RSQRTPS: return GSBI_IX86_BUILTIN_RSQRTPS;
+    case IX86_BUILTIN_RSQRTSS: return GSBI_IX86_BUILTIN_RSQRTSS;
+    case IX86_BUILTIN_SQRTPS: return GSBI_IX86_BUILTIN_SQRTPS;
+    case IX86_BUILTIN_SQRTSS: return GSBI_IX86_BUILTIN_SQRTSS;
+    case IX86_BUILTIN_UNPCKHPS: return GSBI_IX86_BUILTIN_UNPCKHPS;
+    case IX86_BUILTIN_UNPCKLPS: return GSBI_IX86_BUILTIN_UNPCKLPS;
+    case IX86_BUILTIN_ANDPS: return GSBI_IX86_BUILTIN_ANDPS;
+    case IX86_BUILTIN_ANDNPS: return GSBI_IX86_BUILTIN_ANDNPS;
+    case IX86_BUILTIN_ORPS: return GSBI_IX86_BUILTIN_ORPS;
+    case IX86_BUILTIN_XORPS: return GSBI_IX86_BUILTIN_XORPS;
+    case IX86_BUILTIN_EMMS: return GSBI_IX86_BUILTIN_EMMS;
+    case IX86_BUILTIN_LDMXCSR: return GSBI_IX86_BUILTIN_LDMXCSR;
+    case IX86_BUILTIN_STMXCSR: return GSBI_IX86_BUILTIN_STMXCSR;
+    case IX86_BUILTIN_SFENCE: return GSBI_IX86_BUILTIN_SFENCE;
+    case IX86_BUILTIN_FEMMS: return GSBI_IX86_BUILTIN_FEMMS;
+    case IX86_BUILTIN_PAVGUSB: return GSBI_IX86_BUILTIN_PAVGUSB;
+    case IX86_BUILTIN_PF2ID: return GSBI_IX86_BUILTIN_PF2ID;
+    case IX86_BUILTIN_PFACC: return GSBI_IX86_BUILTIN_PFACC;
+    case IX86_BUILTIN_PFADD: return GSBI_IX86_BUILTIN_PFADD;
+    case IX86_BUILTIN_PFCMPEQ: return GSBI_IX86_BUILTIN_PFCMPEQ;
+    case IX86_BUILTIN_PFCMPGE: return GSBI_IX86_BUILTIN_PFCMPGE;
+    case IX86_BUILTIN_PFCMPGT: return GSBI_IX86_BUILTIN_PFCMPGT;
+    case IX86_BUILTIN_PFMAX: return GSBI_IX86_BUILTIN_PFMAX;
+    case IX86_BUILTIN_PFMIN: return GSBI_IX86_BUILTIN_PFMIN;
+    case IX86_BUILTIN_PFMUL: return GSBI_IX86_BUILTIN_PFMUL;
+    case IX86_BUILTIN_PFRCP: return GSBI_IX86_BUILTIN_PFRCP;
+    case IX86_BUILTIN_PFRCPIT1: return GSBI_IX86_BUILTIN_PFRCPIT1;
+    case IX86_BUILTIN_PFRCPIT2: return GSBI_IX86_BUILTIN_PFRCPIT2;
+    case IX86_BUILTIN_PFRSQIT1: return GSBI_IX86_BUILTIN_PFRSQIT1;
+    case IX86_BUILTIN_PFRSQRT: return GSBI_IX86_BUILTIN_PFRSQRT;
+    case IX86_BUILTIN_PFSUB: return GSBI_IX86_BUILTIN_PFSUB;
+    case IX86_BUILTIN_PFSUBR: return GSBI_IX86_BUILTIN_PFSUBR;
+    case IX86_BUILTIN_PI2FD: return GSBI_IX86_BUILTIN_PI2FD;
+    case IX86_BUILTIN_PMULHRW: return GSBI_IX86_BUILTIN_PMULHRW;
+    case IX86_BUILTIN_PF2IW: return GSBI_IX86_BUILTIN_PF2IW;
+    case IX86_BUILTIN_PFNACC: return GSBI_IX86_BUILTIN_PFNACC;
+    case IX86_BUILTIN_PFPNACC: return GSBI_IX86_BUILTIN_PFPNACC;
+    case IX86_BUILTIN_PI2FW: return GSBI_IX86_BUILTIN_PI2FW;
+    case IX86_BUILTIN_PSWAPDSI: return GSBI_IX86_BUILTIN_PSWAPDSI;
+    case IX86_BUILTIN_PSWAPDSF: return GSBI_IX86_BUILTIN_PSWAPDSF;
+    case IX86_BUILTIN_ADDPD: return GSBI_IX86_BUILTIN_ADDPD;
+    case IX86_BUILTIN_ADDSD: return GSBI_IX86_BUILTIN_ADDSD;
+    case IX86_BUILTIN_DIVPD: return GSBI_IX86_BUILTIN_DIVPD;
+    case IX86_BUILTIN_DIVSD: return GSBI_IX86_BUILTIN_DIVSD;
+    case IX86_BUILTIN_MULPD: return GSBI_IX86_BUILTIN_MULPD;
+    case IX86_BUILTIN_MULSD: return GSBI_IX86_BUILTIN_MULSD;
+    case IX86_BUILTIN_SUBPD: return GSBI_IX86_BUILTIN_SUBPD;
+    case IX86_BUILTIN_SUBSD: return GSBI_IX86_BUILTIN_SUBSD;
+    case IX86_BUILTIN_CMPEQPD: return GSBI_IX86_BUILTIN_CMPEQPD;
+    case IX86_BUILTIN_CMPLTPD: return GSBI_IX86_BUILTIN_CMPLTPD;
+    case IX86_BUILTIN_CMPLEPD: return GSBI_IX86_BUILTIN_CMPLEPD;
+    case IX86_BUILTIN_CMPGTPD: return GSBI_IX86_BUILTIN_CMPGTPD;
+    case IX86_BUILTIN_CMPGEPD: return GSBI_IX86_BUILTIN_CMPGEPD;
+    case IX86_BUILTIN_CMPNEQPD: return GSBI_IX86_BUILTIN_CMPNEQPD;
+    case IX86_BUILTIN_CMPNLTPD: return GSBI_IX86_BUILTIN_CMPNLTPD;
+    case IX86_BUILTIN_CMPNLEPD: return GSBI_IX86_BUILTIN_CMPNLEPD;
+    case IX86_BUILTIN_CMPNGTPD: return GSBI_IX86_BUILTIN_CMPNGTPD;
+    case IX86_BUILTIN_CMPNGEPD: return GSBI_IX86_BUILTIN_CMPNGEPD;
+    case IX86_BUILTIN_CMPORDPD: return GSBI_IX86_BUILTIN_CMPORDPD;
+    case IX86_BUILTIN_CMPUNORDPD: return GSBI_IX86_BUILTIN_CMPUNORDPD;
+    case IX86_BUILTIN_CMPNEPD: return GSBI_IX86_BUILTIN_CMPNEPD;
+    case IX86_BUILTIN_CMPEQSD: return GSBI_IX86_BUILTIN_CMPEQSD;
+    case IX86_BUILTIN_CMPLTSD: return GSBI_IX86_BUILTIN_CMPLTSD;
+    case IX86_BUILTIN_CMPLESD: return GSBI_IX86_BUILTIN_CMPLESD;
+    case IX86_BUILTIN_CMPNEQSD: return GSBI_IX86_BUILTIN_CMPNEQSD;
+    case IX86_BUILTIN_CMPNLTSD: return GSBI_IX86_BUILTIN_CMPNLTSD;
+    case IX86_BUILTIN_CMPNLESD: return GSBI_IX86_BUILTIN_CMPNLESD;
+    case IX86_BUILTIN_CMPORDSD: return GSBI_IX86_BUILTIN_CMPORDSD;
+    case IX86_BUILTIN_CMPUNORDSD: return GSBI_IX86_BUILTIN_CMPUNORDSD;
+    case IX86_BUILTIN_CMPNESD: return GSBI_IX86_BUILTIN_CMPNESD;
+    case IX86_BUILTIN_COMIEQSD: return GSBI_IX86_BUILTIN_COMIEQSD;
+    case IX86_BUILTIN_COMILTSD: return GSBI_IX86_BUILTIN_COMILTSD;
+    case IX86_BUILTIN_COMILESD: return GSBI_IX86_BUILTIN_COMILESD;
+    case IX86_BUILTIN_COMIGTSD: return GSBI_IX86_BUILTIN_COMIGTSD;
+    case IX86_BUILTIN_COMIGESD: return GSBI_IX86_BUILTIN_COMIGESD;
+    case IX86_BUILTIN_COMINEQSD: return GSBI_IX86_BUILTIN_COMINEQSD;
+    case IX86_BUILTIN_UCOMIEQSD: return GSBI_IX86_BUILTIN_UCOMIEQSD;
+    case IX86_BUILTIN_UCOMILTSD: return GSBI_IX86_BUILTIN_UCOMILTSD;
+    case IX86_BUILTIN_UCOMILESD: return GSBI_IX86_BUILTIN_UCOMILESD;
+    case IX86_BUILTIN_UCOMIGTSD: return GSBI_IX86_BUILTIN_UCOMIGTSD;
+    case IX86_BUILTIN_UCOMIGESD: return GSBI_IX86_BUILTIN_UCOMIGESD;
+    case IX86_BUILTIN_UCOMINEQSD: return GSBI_IX86_BUILTIN_UCOMINEQSD;
+    case IX86_BUILTIN_MAXPD: return GSBI_IX86_BUILTIN_MAXPD;
+    case IX86_BUILTIN_MAXSD: return GSBI_IX86_BUILTIN_MAXSD;
+    case IX86_BUILTIN_MINPD: return GSBI_IX86_BUILTIN_MINPD;
+    case IX86_BUILTIN_MINSD: return GSBI_IX86_BUILTIN_MINSD;
+    case IX86_BUILTIN_ANDPD: return GSBI_IX86_BUILTIN_ANDPD;
+    case IX86_BUILTIN_ANDNPD: return GSBI_IX86_BUILTIN_ANDNPD;
+    case IX86_BUILTIN_ORPD: return GSBI_IX86_BUILTIN_ORPD;
+    case IX86_BUILTIN_XORPD: return GSBI_IX86_BUILTIN_XORPD;
+    case IX86_BUILTIN_SQRTPD: return GSBI_IX86_BUILTIN_SQRTPD;
+    case IX86_BUILTIN_SQRTSD: return GSBI_IX86_BUILTIN_SQRTSD;
+    case IX86_BUILTIN_UNPCKHPD: return GSBI_IX86_BUILTIN_UNPCKHPD;
+    case IX86_BUILTIN_UNPCKLPD: return GSBI_IX86_BUILTIN_UNPCKLPD;
+    case IX86_BUILTIN_SHUFPD: return GSBI_IX86_BUILTIN_SHUFPD;
+    case IX86_BUILTIN_LOADUPD: return GSBI_IX86_BUILTIN_LOADUPD;
+    case IX86_BUILTIN_STOREUPD: return GSBI_IX86_BUILTIN_STOREUPD;
+    case IX86_BUILTIN_MOVSD: return GSBI_IX86_BUILTIN_MOVSD;
+    case IX86_BUILTIN_LOADHPD: return GSBI_IX86_BUILTIN_LOADHPD;
+    case IX86_BUILTIN_LOADLPD: return GSBI_IX86_BUILTIN_LOADLPD;
+    case IX86_BUILTIN_CVTDQ2PD: return GSBI_IX86_BUILTIN_CVTDQ2PD;
+    case IX86_BUILTIN_CVTDQ2PS: return GSBI_IX86_BUILTIN_CVTDQ2PS;
+    case IX86_BUILTIN_CVTPD2DQ: return GSBI_IX86_BUILTIN_CVTPD2DQ;
+    case IX86_BUILTIN_CVTPD2PI: return GSBI_IX86_BUILTIN_CVTPD2PI;
+    case IX86_BUILTIN_CVTPD2PS: return GSBI_IX86_BUILTIN_CVTPD2PS;
+    case IX86_BUILTIN_CVTTPD2DQ: return GSBI_IX86_BUILTIN_CVTTPD2DQ;
+    case IX86_BUILTIN_CVTTPD2PI: return GSBI_IX86_BUILTIN_CVTTPD2PI;
+    case IX86_BUILTIN_CVTPI2PD: return GSBI_IX86_BUILTIN_CVTPI2PD;
+    case IX86_BUILTIN_CVTSI2SD: return GSBI_IX86_BUILTIN_CVTSI2SD;
+    case IX86_BUILTIN_CVTSI642SD: return GSBI_IX86_BUILTIN_CVTSI642SD;
+    case IX86_BUILTIN_CVTSD2SI: return GSBI_IX86_BUILTIN_CVTSD2SI;
+    case IX86_BUILTIN_CVTSD2SI64: return GSBI_IX86_BUILTIN_CVTSD2SI64;
+    case IX86_BUILTIN_CVTSD2SS: return GSBI_IX86_BUILTIN_CVTSD2SS;
+    case IX86_BUILTIN_CVTSS2SD: return GSBI_IX86_BUILTIN_CVTSS2SD;
+    case IX86_BUILTIN_CVTTSD2SI: return GSBI_IX86_BUILTIN_CVTTSD2SI;
+    case IX86_BUILTIN_CVTTSD2SI64: return GSBI_IX86_BUILTIN_CVTTSD2SI64;
+    case IX86_BUILTIN_CVTPS2DQ: return GSBI_IX86_BUILTIN_CVTPS2DQ;
+    case IX86_BUILTIN_CVTPS2PD: return GSBI_IX86_BUILTIN_CVTPS2PD;
+    case IX86_BUILTIN_CVTTPS2DQ: return GSBI_IX86_BUILTIN_CVTTPS2DQ;
+    case IX86_BUILTIN_MOVNTI: return GSBI_IX86_BUILTIN_MOVNTI;
+    case IX86_BUILTIN_MOVNTPD: return GSBI_IX86_BUILTIN_MOVNTPD;
+    case IX86_BUILTIN_MOVNTDQ: return GSBI_IX86_BUILTIN_MOVNTDQ;
+    case IX86_BUILTIN_MASKMOVDQU: return GSBI_IX86_BUILTIN_MASKMOVDQU;
+    case IX86_BUILTIN_MOVMSKPD: return GSBI_IX86_BUILTIN_MOVMSKPD;
+    case IX86_BUILTIN_PMOVMSKB128: return GSBI_IX86_BUILTIN_PMOVMSKB128;
+    case IX86_BUILTIN_PACKSSWB128: return GSBI_IX86_BUILTIN_PACKSSWB128;
+    case IX86_BUILTIN_PACKSSDW128: return GSBI_IX86_BUILTIN_PACKSSDW128;
+    case IX86_BUILTIN_PACKUSWB128: return GSBI_IX86_BUILTIN_PACKUSWB128;
+    case IX86_BUILTIN_PADDB128: return GSBI_IX86_BUILTIN_PADDB128;
+    case IX86_BUILTIN_PADDW128: return GSBI_IX86_BUILTIN_PADDW128;
+    case IX86_BUILTIN_PADDD128: return GSBI_IX86_BUILTIN_PADDD128;
+    case IX86_BUILTIN_PADDQ128: return GSBI_IX86_BUILTIN_PADDQ128;
+    case IX86_BUILTIN_PADDSB128: return GSBI_IX86_BUILTIN_PADDSB128;
+    case IX86_BUILTIN_PADDSW128: return GSBI_IX86_BUILTIN_PADDSW128;
+    case IX86_BUILTIN_PADDUSB128: return GSBI_IX86_BUILTIN_PADDUSB128;
+    case IX86_BUILTIN_PADDUSW128: return GSBI_IX86_BUILTIN_PADDUSW128;
+    case IX86_BUILTIN_PSUBB128: return GSBI_IX86_BUILTIN_PSUBB128;
+    case IX86_BUILTIN_PSUBW128: return GSBI_IX86_BUILTIN_PSUBW128;
+    case IX86_BUILTIN_PSUBD128: return GSBI_IX86_BUILTIN_PSUBD128;
+    case IX86_BUILTIN_PSUBQ128: return GSBI_IX86_BUILTIN_PSUBQ128;
+    case IX86_BUILTIN_PSUBSB128: return GSBI_IX86_BUILTIN_PSUBSB128;
+    case IX86_BUILTIN_PSUBSW128: return GSBI_IX86_BUILTIN_PSUBSW128;
+    case IX86_BUILTIN_PSUBUSB128: return GSBI_IX86_BUILTIN_PSUBUSB128;
+    case IX86_BUILTIN_PSUBUSW128: return GSBI_IX86_BUILTIN_PSUBUSW128;
+    case IX86_BUILTIN_PAND128: return GSBI_IX86_BUILTIN_PAND128;
+    case IX86_BUILTIN_PANDN128: return GSBI_IX86_BUILTIN_PANDN128;
+    case IX86_BUILTIN_POR128: return GSBI_IX86_BUILTIN_POR128;
+    case IX86_BUILTIN_PXOR128: return GSBI_IX86_BUILTIN_PXOR128;
+    case IX86_BUILTIN_PAVGB128: return GSBI_IX86_BUILTIN_PAVGB128;
+    case IX86_BUILTIN_PAVGW128: return GSBI_IX86_BUILTIN_PAVGW128;
+    case IX86_BUILTIN_PCMPEQB128: return GSBI_IX86_BUILTIN_PCMPEQB128;
+    case IX86_BUILTIN_PCMPEQW128: return GSBI_IX86_BUILTIN_PCMPEQW128;
+    case IX86_BUILTIN_PCMPEQD128: return GSBI_IX86_BUILTIN_PCMPEQD128;
+    case IX86_BUILTIN_PCMPGTB128: return GSBI_IX86_BUILTIN_PCMPGTB128;
+    case IX86_BUILTIN_PCMPGTW128: return GSBI_IX86_BUILTIN_PCMPGTW128;
+    case IX86_BUILTIN_PCMPGTD128: return GSBI_IX86_BUILTIN_PCMPGTD128;
+    case IX86_BUILTIN_PMADDWD128: return GSBI_IX86_BUILTIN_PMADDWD128;
+    case IX86_BUILTIN_PMAXSW128: return GSBI_IX86_BUILTIN_PMAXSW128;
+    case IX86_BUILTIN_PMAXUB128: return GSBI_IX86_BUILTIN_PMAXUB128;
+    case IX86_BUILTIN_PMINSW128: return GSBI_IX86_BUILTIN_PMINSW128;
+    case IX86_BUILTIN_PMINUB128: return GSBI_IX86_BUILTIN_PMINUB128;
+    case IX86_BUILTIN_PMULUDQ: return GSBI_IX86_BUILTIN_PMULUDQ;
+    case IX86_BUILTIN_PMULUDQ128: return GSBI_IX86_BUILTIN_PMULUDQ128;
+    case IX86_BUILTIN_PMULHUW128: return GSBI_IX86_BUILTIN_PMULHUW128;
+    case IX86_BUILTIN_PMULHW128: return GSBI_IX86_BUILTIN_PMULHW128;
+    case IX86_BUILTIN_PMULLW128: return GSBI_IX86_BUILTIN_PMULLW128;
+    case IX86_BUILTIN_PSADBW128: return GSBI_IX86_BUILTIN_PSADBW128;
+    case IX86_BUILTIN_PSHUFHW: return GSBI_IX86_BUILTIN_PSHUFHW;
+    case IX86_BUILTIN_PSHUFLW: return GSBI_IX86_BUILTIN_PSHUFLW;
+    case IX86_BUILTIN_PSHUFD: return GSBI_IX86_BUILTIN_PSHUFD;
+    case IX86_BUILTIN_PSLLW128: return GSBI_IX86_BUILTIN_PSLLW128;
+    case IX86_BUILTIN_PSLLD128: return GSBI_IX86_BUILTIN_PSLLD128;
+    case IX86_BUILTIN_PSLLQ128: return GSBI_IX86_BUILTIN_PSLLQ128;
+    case IX86_BUILTIN_PSRAW128: return GSBI_IX86_BUILTIN_PSRAW128;
+    case IX86_BUILTIN_PSRAD128: return GSBI_IX86_BUILTIN_PSRAD128;
+    case IX86_BUILTIN_PSRLW128: return GSBI_IX86_BUILTIN_PSRLW128;
+    case IX86_BUILTIN_PSRLD128: return GSBI_IX86_BUILTIN_PSRLD128;
+    case IX86_BUILTIN_PSRLQ128: return GSBI_IX86_BUILTIN_PSRLQ128;
+    case IX86_BUILTIN_PSLLDQI128: return GSBI_IX86_BUILTIN_PSLLDQI128;
+    case IX86_BUILTIN_PSLLWI128: return GSBI_IX86_BUILTIN_PSLLWI128;
+    case IX86_BUILTIN_PSLLDI128: return GSBI_IX86_BUILTIN_PSLLDI128;
+    case IX86_BUILTIN_PSLLQI128: return GSBI_IX86_BUILTIN_PSLLQI128;
+    case IX86_BUILTIN_PSRAWI128: return GSBI_IX86_BUILTIN_PSRAWI128;
+    case IX86_BUILTIN_PSRADI128: return GSBI_IX86_BUILTIN_PSRADI128;
+    case IX86_BUILTIN_PSRLDQI128: return GSBI_IX86_BUILTIN_PSRLDQI128;
+    case IX86_BUILTIN_PSRLWI128: return GSBI_IX86_BUILTIN_PSRLWI128;
+    case IX86_BUILTIN_PSRLDI128: return GSBI_IX86_BUILTIN_PSRLDI128;
+    case IX86_BUILTIN_PSRLQI128: return GSBI_IX86_BUILTIN_PSRLQI128;
+    case IX86_BUILTIN_PUNPCKHBW128: return GSBI_IX86_BUILTIN_PUNPCKHBW128;
+    case IX86_BUILTIN_PUNPCKHWD128: return GSBI_IX86_BUILTIN_PUNPCKHWD128;
+    case IX86_BUILTIN_PUNPCKHDQ128: return GSBI_IX86_BUILTIN_PUNPCKHDQ128;
+    case IX86_BUILTIN_PUNPCKHQDQ128: return GSBI_IX86_BUILTIN_PUNPCKHQDQ128;
+    case IX86_BUILTIN_PUNPCKLBW128: return GSBI_IX86_BUILTIN_PUNPCKLBW128;
+    case IX86_BUILTIN_PUNPCKLWD128: return GSBI_IX86_BUILTIN_PUNPCKLWD128;
+    case IX86_BUILTIN_PUNPCKLDQ128: return GSBI_IX86_BUILTIN_PUNPCKLDQ128;
+    case IX86_BUILTIN_PUNPCKLQDQ128: return GSBI_IX86_BUILTIN_PUNPCKLQDQ128;
+    case IX86_BUILTIN_CLFLUSH: return GSBI_IX86_BUILTIN_CLFLUSH;
+    case IX86_BUILTIN_MFENCE: return GSBI_IX86_BUILTIN_MFENCE;
+    case IX86_BUILTIN_LFENCE: return GSBI_IX86_BUILTIN_LFENCE;
+    case IX86_BUILTIN_ADDSUBPS: return GSBI_IX86_BUILTIN_ADDSUBPS;
+    case IX86_BUILTIN_HADDPS: return GSBI_IX86_BUILTIN_HADDPS;
+    case IX86_BUILTIN_HSUBPS: return GSBI_IX86_BUILTIN_HSUBPS;
+    case IX86_BUILTIN_MOVSHDUP: return GSBI_IX86_BUILTIN_MOVSHDUP;
+    case IX86_BUILTIN_MOVSLDUP: return GSBI_IX86_BUILTIN_MOVSLDUP;
+    case IX86_BUILTIN_ADDSUBPD: return GSBI_IX86_BUILTIN_ADDSUBPD;
+    case IX86_BUILTIN_HADDPD: return GSBI_IX86_BUILTIN_HADDPD;
+    case IX86_BUILTIN_HSUBPD: return GSBI_IX86_BUILTIN_HSUBPD;
+    case IX86_BUILTIN_LDDQU: return GSBI_IX86_BUILTIN_LDDQU;
+    case IX86_BUILTIN_MONITOR: return GSBI_IX86_BUILTIN_MONITOR;
+    case IX86_BUILTIN_MWAIT: return GSBI_IX86_BUILTIN_MWAIT;
+    case IX86_BUILTIN_VEC_INIT_V2SI: return GSBI_IX86_BUILTIN_VEC_INIT_V2SI;
+    case IX86_BUILTIN_VEC_INIT_V4HI: return GSBI_IX86_BUILTIN_VEC_INIT_V4HI;
+    case IX86_BUILTIN_VEC_INIT_V8QI: return GSBI_IX86_BUILTIN_VEC_INIT_V8QI;
+    case IX86_BUILTIN_VEC_EXT_V2DF: return GSBI_IX86_BUILTIN_VEC_EXT_V2DF;
+    case IX86_BUILTIN_VEC_EXT_V2DI: return GSBI_IX86_BUILTIN_VEC_EXT_V2DI;
+    case IX86_BUILTIN_VEC_EXT_V4SF: return GSBI_IX86_BUILTIN_VEC_EXT_V4SF;
+    case IX86_BUILTIN_VEC_EXT_V4SI: return GSBI_IX86_BUILTIN_VEC_EXT_V4SI;
+    case IX86_BUILTIN_VEC_EXT_V8HI: return GSBI_IX86_BUILTIN_VEC_EXT_V8HI;
+    case IX86_BUILTIN_VEC_EXT_V2SI: return GSBI_IX86_BUILTIN_VEC_EXT_V2SI;
+    case IX86_BUILTIN_VEC_EXT_V4HI: return GSBI_IX86_BUILTIN_VEC_EXT_V4HI;
+    case IX86_BUILTIN_VEC_SET_V8HI: return GSBI_IX86_BUILTIN_VEC_SET_V8HI;
+    case IX86_BUILTIN_VEC_SET_V4HI: return GSBI_IX86_BUILTIN_VEC_SET_V4HI;
+    case IX86_BUILTIN_MOVNTSS: return GSBI_IX86_BUILTIN_MOVNTSS;
+    case IX86_BUILTIN_MOVNTSD: return GSBI_IX86_BUILTIN_MOVNTSD;
+    case IX86_BUILTIN_EXTRQI: return GSBI_IX86_BUILTIN_EXTRQI;
+    case IX86_BUILTIN_EXTRQ: return GSBI_IX86_BUILTIN_EXTRQ;
+    case IX86_BUILTIN_INSERTQI: return GSBI_IX86_BUILTIN_INSERTQI;
+    case IX86_BUILTIN_INSERTQ: return GSBI_IX86_BUILTIN_INSERTQ;
+
+    /* SSSE3 intrinsics */
+    case IX86_BUILTIN_PABSB:    return GSBI_IX86_BUILTIN_PABSB;
+    case IX86_BUILTIN_PABSB128: return GSBI_IX86_BUILTIN_PABSB128;
+    case IX86_BUILTIN_PABSD:    return GSBI_IX86_BUILTIN_PABSD;
+    case IX86_BUILTIN_PABSD128: return GSBI_IX86_BUILTIN_PABSD128;
+    case IX86_BUILTIN_PABSW:    return GSBI_IX86_BUILTIN_PABSW;
+    case IX86_BUILTIN_PABSW128: return GSBI_IX86_BUILTIN_PABSW128;
+    case IX86_BUILTIN_PALIGNR:  return GSBI_IX86_BUILTIN_PALIGNR;
+    case IX86_BUILTIN_PALIGNR128:       return GSBI_IX86_BUILTIN_PALIGNR128;
+    case IX86_BUILTIN_PHADDD:   return GSBI_IX86_BUILTIN_PHADDD;
+    case IX86_BUILTIN_PHADDD128:        return GSBI_IX86_BUILTIN_PHADDD128;
+    case IX86_BUILTIN_PHADDSW:  return GSBI_IX86_BUILTIN_PHADDSW;
+    case IX86_BUILTIN_PHADDSW128:       return GSBI_IX86_BUILTIN_PHADDSW128;
+    case IX86_BUILTIN_PHADDW:   return GSBI_IX86_BUILTIN_PHADDW;
+    case IX86_BUILTIN_PHADDW128:        return GSBI_IX86_BUILTIN_PHADDW128;
+    case IX86_BUILTIN_PHSUBD:   return GSBI_IX86_BUILTIN_PHSUBD;
+    case IX86_BUILTIN_PHSUBD128:        return GSBI_IX86_BUILTIN_PHSUBD128;
+    case IX86_BUILTIN_PHSUBSW:  return GSBI_IX86_BUILTIN_PHSUBSW;
+    case IX86_BUILTIN_PHSUBSW128:       return GSBI_IX86_BUILTIN_PHSUBSW128;
+    case IX86_BUILTIN_PHSUBW:   return GSBI_IX86_BUILTIN_PHSUBW;
+    case IX86_BUILTIN_PHSUBW128:        return GSBI_IX86_BUILTIN_PHSUBW128;
+    case IX86_BUILTIN_PMADDUBSW:        return GSBI_IX86_BUILTIN_PMADDUBSW;
+    case IX86_BUILTIN_PMADDUBSW128:     return GSBI_IX86_BUILTIN_PMADDUBSW128;
+    case IX86_BUILTIN_PMULHRSW: return GSBI_IX86_BUILTIN_PMULHRSW;
+    case IX86_BUILTIN_PMULHRSW128:      return GSBI_IX86_BUILTIN_PMULHRSW128;
+    case IX86_BUILTIN_PSHUFB:   return GSBI_IX86_BUILTIN_PSHUFB;
+    case IX86_BUILTIN_PSHUFB128:        return GSBI_IX86_BUILTIN_PSHUFB128;
+    case IX86_BUILTIN_PSIGNB:   return GSBI_IX86_BUILTIN_PSIGNB;
+    case IX86_BUILTIN_PSIGNB128:        return GSBI_IX86_BUILTIN_PSIGNB128;
+    case IX86_BUILTIN_PSIGND:   return GSBI_IX86_BUILTIN_PSIGND;
+    case IX86_BUILTIN_PSIGND128:        return GSBI_IX86_BUILTIN_PSIGND128;
+    case IX86_BUILTIN_PSIGNW:   return GSBI_IX86_BUILTIN_PSIGNW;
+    case IX86_BUILTIN_PSIGNW128:        return GSBI_IX86_BUILTIN_PSIGNW128;
+
+    /* SSE4.1 intrinsics */
+    case IX86_BUILTIN_BLENDPD:  return GSBI_IX86_BUILTIN_BLENDPD;
+    case IX86_BUILTIN_BLENDPS:  return GSBI_IX86_BUILTIN_BLENDPS;
+    case IX86_BUILTIN_BLENDVPD: return GSBI_IX86_BUILTIN_BLENDVPD;
+    case IX86_BUILTIN_BLENDVPS: return GSBI_IX86_BUILTIN_BLENDVPS;
+    case IX86_BUILTIN_DPPD:     return GSBI_IX86_BUILTIN_DPPD;
+    case IX86_BUILTIN_DPPS:     return GSBI_IX86_BUILTIN_DPPS;
+    case IX86_BUILTIN_INSERTPS128:      return GSBI_IX86_BUILTIN_INSERTPS128;
+    case IX86_BUILTIN_MOVNTDQA: return GSBI_IX86_BUILTIN_MOVNTDQA;
+    case IX86_BUILTIN_MPSADBW128:       return GSBI_IX86_BUILTIN_MPSADBW128;
+    case IX86_BUILTIN_PACKUSDW128:      return GSBI_IX86_BUILTIN_PACKUSDW128;
+    case IX86_BUILTIN_PBLENDVB128:      return GSBI_IX86_BUILTIN_PBLENDVB128;
+    case IX86_BUILTIN_PBLENDW128:       return GSBI_IX86_BUILTIN_PBLENDW128;
+    case IX86_BUILTIN_PCMPEQQ:  return GSBI_IX86_BUILTIN_PCMPEQQ;
+    case IX86_BUILTIN_PHMINPOSUW128:    return GSBI_IX86_BUILTIN_PHMINPOSUW128;
+    case IX86_BUILTIN_PMAXSB128:        return GSBI_IX86_BUILTIN_PMAXSB128;
+    case IX86_BUILTIN_PMAXSD128:        return GSBI_IX86_BUILTIN_PMAXSD128;
+    case IX86_BUILTIN_PMAXUD128:        return GSBI_IX86_BUILTIN_PMAXUD128;
+    case IX86_BUILTIN_PMAXUW128:        return GSBI_IX86_BUILTIN_PMAXUW128;
+    case IX86_BUILTIN_PMINSB128:        return GSBI_IX86_BUILTIN_PMINSB128;
+    case IX86_BUILTIN_PMINSD128:        return GSBI_IX86_BUILTIN_PMINSD128;
+    case IX86_BUILTIN_PMINUD128:        return GSBI_IX86_BUILTIN_PMINUD128;
+    case IX86_BUILTIN_PMINUW128:        return GSBI_IX86_BUILTIN_PMINUW128;
+    case IX86_BUILTIN_PMOVSXBD128:      return GSBI_IX86_BUILTIN_PMOVSXBD128;
+    case IX86_BUILTIN_PMOVSXBQ128:      return GSBI_IX86_BUILTIN_PMOVSXBQ128;
+    case IX86_BUILTIN_PMOVSXBW128:      return GSBI_IX86_BUILTIN_PMOVSXBW128;
+    case IX86_BUILTIN_PMOVSXDQ128:      return GSBI_IX86_BUILTIN_PMOVSXDQ128;
+    case IX86_BUILTIN_PMOVSXWD128:      return GSBI_IX86_BUILTIN_PMOVSXWD128;
+    case IX86_BUILTIN_PMOVSXWQ128:      return GSBI_IX86_BUILTIN_PMOVSXWQ128;
+    case IX86_BUILTIN_PMOVZXBD128:      return GSBI_IX86_BUILTIN_PMOVZXBD128;
+    case IX86_BUILTIN_PMOVZXBQ128:      return GSBI_IX86_BUILTIN_PMOVZXBQ128;
+    case IX86_BUILTIN_PMOVZXBW128:      return GSBI_IX86_BUILTIN_PMOVZXBW128;
+    case IX86_BUILTIN_PMOVZXDQ128:      return GSBI_IX86_BUILTIN_PMOVZXDQ128;
+    case IX86_BUILTIN_PMOVZXWD128:      return GSBI_IX86_BUILTIN_PMOVZXWD128;
+    case IX86_BUILTIN_PMOVZXWQ128:      return GSBI_IX86_BUILTIN_PMOVZXWQ128;
+    case IX86_BUILTIN_PMULDQ128:        return GSBI_IX86_BUILTIN_PMULDQ128;
+    case IX86_BUILTIN_PMULLD128:        return GSBI_IX86_BUILTIN_PMULLD128;
+    case IX86_BUILTIN_VEC_SET_V16QI:    return GSBI_IX86_BUILTIN_VEC_SET_V16QI;
+    case IX86_BUILTIN_VEC_SET_V2DI:     return GSBI_IX86_BUILTIN_VEC_SET_V2DI;
+    case IX86_BUILTIN_VEC_SET_V4SF:     return GSBI_IX86_BUILTIN_VEC_SET_V4SF;
+    case IX86_BUILTIN_VEC_SET_V4SI:     return GSBI_IX86_BUILTIN_VEC_SET_V4SI;
+
+    /* SSE4.2 intrinsics */
+    case IX86_BUILTIN_CRC32DI:  return GSBI_IX86_BUILTIN_CRC32DI;
+    case IX86_BUILTIN_CRC32HI:  return GSBI_IX86_BUILTIN_CRC32HI;
+    case IX86_BUILTIN_CRC32QI:  return GSBI_IX86_BUILTIN_CRC32QI;
+    case IX86_BUILTIN_CRC32SI:  return GSBI_IX86_BUILTIN_CRC32SI;
+    case IX86_BUILTIN_PCMPESTRI128:     return GSBI_IX86_BUILTIN_PCMPESTRI128;
+    case IX86_BUILTIN_PCMPESTRA128:     return GSBI_IX86_BUILTIN_PCMPESTRA128;
+    case IX86_BUILTIN_PCMPESTRC128:     return GSBI_IX86_BUILTIN_PCMPESTRC128;
+    case IX86_BUILTIN_PCMPESTRO128:     return GSBI_IX86_BUILTIN_PCMPESTRO128;
+    case IX86_BUILTIN_PCMPESTRS128:     return GSBI_IX86_BUILTIN_PCMPESTRS128;
+    case IX86_BUILTIN_PCMPESTRZ128:     return GSBI_IX86_BUILTIN_PCMPESTRZ128;
+    case IX86_BUILTIN_PCMPESTRM128:     return GSBI_IX86_BUILTIN_PCMPESTRM128;
+    case IX86_BUILTIN_PCMPGTQ:  return GSBI_IX86_BUILTIN_PCMPGTQ;
+    case IX86_BUILTIN_PCMPISTRI128:     return GSBI_IX86_BUILTIN_PCMPISTRI128;
+    case IX86_BUILTIN_PCMPISTRA128:     return GSBI_IX86_BUILTIN_PCMPISTRA128;
+    case IX86_BUILTIN_PCMPISTRC128:     return GSBI_IX86_BUILTIN_PCMPISTRC128;
+    case IX86_BUILTIN_PCMPISTRO128:     return GSBI_IX86_BUILTIN_PCMPISTRO128;
+    case IX86_BUILTIN_PCMPISTRS128:     return GSBI_IX86_BUILTIN_PCMPISTRS128;
+    case IX86_BUILTIN_PCMPISTRZ128:     return GSBI_IX86_BUILTIN_PCMPISTRZ128;
+    case IX86_BUILTIN_PCMPISTRM128:     return GSBI_IX86_BUILTIN_PCMPISTRM128;
+
+    /* AES intrinsics */
+    case IX86_BUILTIN_AESDEC128:        return GSBI_IX86_BUILTIN_AESDEC128;
+    case IX86_BUILTIN_AESDECLAST128:    return GSBI_IX86_BUILTIN_AESDECLAST128;
+    case IX86_BUILTIN_AESENC128:        return GSBI_IX86_BUILTIN_AESENC128;
+    case IX86_BUILTIN_AESENCLAST128:    return GSBI_IX86_BUILTIN_AESENCLAST128;
+    case IX86_BUILTIN_AESIMC128:        return GSBI_IX86_BUILTIN_AESIMC128;
+    case IX86_BUILTIN_AESKEYGENASSIST128:       return GSBI_IX86_BUILTIN_AESKEYGENASSIST128;
+
+    /* PCLMUL intrinsics */
+    case IX86_BUILTIN_PCLMULQDQ128:     return GSBI_IX86_BUILTIN_PCLMULQDQ128;
+
+    /* AVX intrinsics */
+    case IX86_BUILTIN_ADDPD256: return GSBI_IX86_BUILTIN_ADDPD256;
+    case IX86_BUILTIN_ADDPS256: return GSBI_IX86_BUILTIN_ADDPS256;
+    case IX86_BUILTIN_ADDSUBPD256:      return GSBI_IX86_BUILTIN_ADDSUBPD256;
+    case IX86_BUILTIN_ADDSUBPS256:      return GSBI_IX86_BUILTIN_ADDSUBPS256;
+    case IX86_BUILTIN_ANDNPD256:        return GSBI_IX86_BUILTIN_ANDNPD256;
+    case IX86_BUILTIN_ANDNPS256:        return GSBI_IX86_BUILTIN_ANDNPS256;
+    case IX86_BUILTIN_ANDPD256: return GSBI_IX86_BUILTIN_ANDPD256;
+    case IX86_BUILTIN_ANDPS256: return GSBI_IX86_BUILTIN_ANDPS256;
+    case IX86_BUILTIN_BLENDPD256:       return GSBI_IX86_BUILTIN_BLENDPD256;
+    case IX86_BUILTIN_BLENDPS256:       return GSBI_IX86_BUILTIN_BLENDPS256;
+    case IX86_BUILTIN_BLENDVPD256:      return GSBI_IX86_BUILTIN_BLENDVPD256;
+    case IX86_BUILTIN_BLENDVPS256:      return GSBI_IX86_BUILTIN_BLENDVPS256;
+    case IX86_BUILTIN_CMPPD:    return GSBI_IX86_BUILTIN_CMPPD;
+    case IX86_BUILTIN_CMPPD256: return GSBI_IX86_BUILTIN_CMPPD256;
+    case IX86_BUILTIN_CMPPS:    return GSBI_IX86_BUILTIN_CMPPS;
+    case IX86_BUILTIN_CMPPS256: return GSBI_IX86_BUILTIN_CMPPS256;
+    case IX86_BUILTIN_CMPSD:    return GSBI_IX86_BUILTIN_CMPSD;
+    case IX86_BUILTIN_CMPSS:    return GSBI_IX86_BUILTIN_CMPSS;
+    case IX86_BUILTIN_CVTDQ2PD256:      return GSBI_IX86_BUILTIN_CVTDQ2PD256;
+    case IX86_BUILTIN_CVTDQ2PS256:      return GSBI_IX86_BUILTIN_CVTDQ2PS256;
+    case IX86_BUILTIN_CVTPD2DQ256:      return GSBI_IX86_BUILTIN_CVTPD2DQ256;
+    case IX86_BUILTIN_CVTPD2PS256:      return GSBI_IX86_BUILTIN_CVTPD2PS256;
+    case IX86_BUILTIN_CVTPS2DQ256:      return GSBI_IX86_BUILTIN_CVTPS2DQ256;
+    case IX86_BUILTIN_CVTPS2PD256:      return GSBI_IX86_BUILTIN_CVTPS2PD256;
+    case IX86_BUILTIN_CVTTPD2DQ256:     return GSBI_IX86_BUILTIN_CVTTPD2DQ256;
+    case IX86_BUILTIN_CVTTPS2DQ256:     return GSBI_IX86_BUILTIN_CVTTPS2DQ256;
+    case IX86_BUILTIN_DIVPD256: return GSBI_IX86_BUILTIN_DIVPD256;
+    case IX86_BUILTIN_DIVPS256: return GSBI_IX86_BUILTIN_DIVPS256;
+    case IX86_BUILTIN_DPPS256:  return GSBI_IX86_BUILTIN_DPPS256;
+    case IX86_BUILTIN_HADDPD256:        return GSBI_IX86_BUILTIN_HADDPD256;
+    case IX86_BUILTIN_HADDPS256:        return GSBI_IX86_BUILTIN_HADDPS256;
+    case IX86_BUILTIN_HSUBPD256:        return GSBI_IX86_BUILTIN_HSUBPD256;
+    case IX86_BUILTIN_HSUBPS256:        return GSBI_IX86_BUILTIN_HSUBPS256;
+    case IX86_BUILTIN_LDDQU256: return GSBI_IX86_BUILTIN_LDDQU256;
+    case IX86_BUILTIN_LOADDQU256:       return GSBI_IX86_BUILTIN_LOADDQU256;
+    case IX86_BUILTIN_LOADUPD256:       return GSBI_IX86_BUILTIN_LOADUPD256;
+    case IX86_BUILTIN_LOADUPS256:       return GSBI_IX86_BUILTIN_LOADUPS256;
+    case IX86_BUILTIN_MASKLOADPD:       return GSBI_IX86_BUILTIN_MASKLOADPD;
+    case IX86_BUILTIN_MASKLOADPD256:    return GSBI_IX86_BUILTIN_MASKLOADPD256;
+    case IX86_BUILTIN_MASKLOADPS:       return GSBI_IX86_BUILTIN_MASKLOADPS;
+    case IX86_BUILTIN_MASKLOADPS256:    return GSBI_IX86_BUILTIN_MASKLOADPS256;
+    case IX86_BUILTIN_MASKSTOREPD:      return GSBI_IX86_BUILTIN_MASKSTOREPD;
+    case IX86_BUILTIN_MASKSTOREPD256:   return GSBI_IX86_BUILTIN_MASKSTOREPD256;
+    case IX86_BUILTIN_MASKSTOREPS:      return GSBI_IX86_BUILTIN_MASKSTOREPS;
+    case IX86_BUILTIN_MASKSTOREPS256:   return GSBI_IX86_BUILTIN_MASKSTOREPS256;
+    case IX86_BUILTIN_MAXPD256: return GSBI_IX86_BUILTIN_MAXPD256;
+    case IX86_BUILTIN_MAXPS256: return GSBI_IX86_BUILTIN_MAXPS256;
+    case IX86_BUILTIN_MINPD256: return GSBI_IX86_BUILTIN_MINPD256;
+    case IX86_BUILTIN_MINPS256: return GSBI_IX86_BUILTIN_MINPS256;
+    case IX86_BUILTIN_MOVDDUP256:       return GSBI_IX86_BUILTIN_MOVDDUP256;
+    case IX86_BUILTIN_MOVMSKPD256:      return GSBI_IX86_BUILTIN_MOVMSKPD256;
+    case IX86_BUILTIN_MOVMSKPS256:      return GSBI_IX86_BUILTIN_MOVMSKPS256;
+    case IX86_BUILTIN_MOVNTDQ256:       return GSBI_IX86_BUILTIN_MOVNTDQ256;
+    case IX86_BUILTIN_MOVNTPD256:       return GSBI_IX86_BUILTIN_MOVNTPD256;
+    case IX86_BUILTIN_MOVNTPS256:       return GSBI_IX86_BUILTIN_MOVNTPS256;
+    case IX86_BUILTIN_MOVSHDUP256:      return GSBI_IX86_BUILTIN_MOVSHDUP256;
+    case IX86_BUILTIN_MOVSLDUP256:      return GSBI_IX86_BUILTIN_MOVSLDUP256;
+    case IX86_BUILTIN_MULPD256: return GSBI_IX86_BUILTIN_MULPD256;
+    case IX86_BUILTIN_MULPS256: return GSBI_IX86_BUILTIN_MULPS256;
+    case IX86_BUILTIN_ORPD256:  return GSBI_IX86_BUILTIN_ORPD256;
+    case IX86_BUILTIN_ORPS256:  return GSBI_IX86_BUILTIN_ORPS256;
+    case IX86_BUILTIN_PD256_PD: return GSBI_IX86_BUILTIN_PD256_PD;
+    case IX86_BUILTIN_PD_PD256: return GSBI_IX86_BUILTIN_PD_PD256;
+    case IX86_BUILTIN_PS256_PS: return GSBI_IX86_BUILTIN_PS256_PS;
+    case IX86_BUILTIN_PS_PS256: return GSBI_IX86_BUILTIN_PS_PS256;
+    case IX86_BUILTIN_PTESTC256:        return GSBI_IX86_BUILTIN_PTESTC256;
+    case IX86_BUILTIN_PTESTNZC256:      return GSBI_IX86_BUILTIN_PTESTNZC256;
+    case IX86_BUILTIN_PTESTZ256:        return GSBI_IX86_BUILTIN_PTESTZ256;
+    case IX86_BUILTIN_RCPPS256: return GSBI_IX86_BUILTIN_RCPPS256;
+    case IX86_BUILTIN_ROUNDPD256:       return GSBI_IX86_BUILTIN_ROUNDPD256;
+    case IX86_BUILTIN_ROUNDPS256:       return GSBI_IX86_BUILTIN_ROUNDPS256;
+    case IX86_BUILTIN_RSQRTPS256:       return GSBI_IX86_BUILTIN_RSQRTPS256;
+    case IX86_BUILTIN_RSQRTPS_NR256:    return GSBI_IX86_BUILTIN_RSQRTPS_NR256;
+    case IX86_BUILTIN_SHUFPD256:        return GSBI_IX86_BUILTIN_SHUFPD256;
+    case IX86_BUILTIN_SHUFPS256:        return GSBI_IX86_BUILTIN_SHUFPS256;
+    case IX86_BUILTIN_SI256_SI: return GSBI_IX86_BUILTIN_SI256_SI;
+    case IX86_BUILTIN_SI_SI256: return GSBI_IX86_BUILTIN_SI_SI256;
+    case IX86_BUILTIN_SQRTPD256:        return GSBI_IX86_BUILTIN_SQRTPD256;
+    case IX86_BUILTIN_SQRTPS256:        return GSBI_IX86_BUILTIN_SQRTPS256;
+    case IX86_BUILTIN_SQRTPS_NR256:     return GSBI_IX86_BUILTIN_SQRTPS_NR256;
+    case IX86_BUILTIN_STOREDQU256:      return GSBI_IX86_BUILTIN_STOREDQU256;
+    case IX86_BUILTIN_STOREUPD256:      return GSBI_IX86_BUILTIN_STOREUPD256;
+    case IX86_BUILTIN_STOREUPS256:      return GSBI_IX86_BUILTIN_STOREUPS256;
+    case IX86_BUILTIN_SUBPD256: return GSBI_IX86_BUILTIN_SUBPD256;
+    case IX86_BUILTIN_SUBPS256: return GSBI_IX86_BUILTIN_SUBPS256;
+    case IX86_BUILTIN_UNPCKHPD256:      return GSBI_IX86_BUILTIN_UNPCKHPD256;
+    case IX86_BUILTIN_UNPCKHPS256:      return GSBI_IX86_BUILTIN_UNPCKHPS256;
+    case IX86_BUILTIN_UNPCKLPD256:      return GSBI_IX86_BUILTIN_UNPCKLPD256;
+    case IX86_BUILTIN_UNPCKLPS256:      return GSBI_IX86_BUILTIN_UNPCKLPS256;
+    case IX86_BUILTIN_VBROADCASTPD256:  return GSBI_IX86_BUILTIN_VBROADCASTPD256;
+    case IX86_BUILTIN_VBROADCASTPS256:  return GSBI_IX86_BUILTIN_VBROADCASTPS256;
+    case IX86_BUILTIN_VBROADCASTSD256:  return GSBI_IX86_BUILTIN_VBROADCASTSD256;
+    case IX86_BUILTIN_VBROADCASTSS:     return GSBI_IX86_BUILTIN_VBROADCASTSS;
+    case IX86_BUILTIN_VBROADCASTSS256:  return GSBI_IX86_BUILTIN_VBROADCASTSS256;
+    case IX86_BUILTIN_EXTRACTF128PD256: return GSBI_IX86_BUILTIN_EXTRACTF128PD256;
+    case IX86_BUILTIN_EXTRACTF128PS256: return GSBI_IX86_BUILTIN_EXTRACTF128PS256;
+    case IX86_BUILTIN_EXTRACTF128SI256: return GSBI_IX86_BUILTIN_EXTRACTF128SI256;
+    case IX86_BUILTIN_VINSERTF128PD256: return GSBI_IX86_BUILTIN_VINSERTF128PD256;
+    case IX86_BUILTIN_VINSERTF128PS256: return GSBI_IX86_BUILTIN_VINSERTF128PS256;
+    case IX86_BUILTIN_VINSERTF128SI256: return GSBI_IX86_BUILTIN_VINSERTF128SI256;
+    case IX86_BUILTIN_VPERM2F128PD256:  return GSBI_IX86_BUILTIN_VPERM2F128PD256;
+    case IX86_BUILTIN_VPERM2F128PS256:  return GSBI_IX86_BUILTIN_VPERM2F128PS256;
+    case IX86_BUILTIN_VPERM2F128SI256:  return GSBI_IX86_BUILTIN_VPERM2F128SI256;
+    case IX86_BUILTIN_VPERMILPD:        return GSBI_IX86_BUILTIN_VPERMILPD;
+    case IX86_BUILTIN_VPERMILPD256:     return GSBI_IX86_BUILTIN_VPERMILPD256;
+    case IX86_BUILTIN_VPERMILPS:        return GSBI_IX86_BUILTIN_VPERMILPS;
+    case IX86_BUILTIN_VPERMILPS256:     return GSBI_IX86_BUILTIN_VPERMILPS256;
+    case IX86_BUILTIN_VPERMILVARPD:     return GSBI_IX86_BUILTIN_VPERMILVARPD;
+    case IX86_BUILTIN_VPERMILVARPD256:  return GSBI_IX86_BUILTIN_VPERMILVARPD256;
+    case IX86_BUILTIN_VPERMILVARPS:     return GSBI_IX86_BUILTIN_VPERMILVARPS;
+    case IX86_BUILTIN_VPERMILVARPS256:  return GSBI_IX86_BUILTIN_VPERMILVARPS256;
+    case IX86_BUILTIN_VTESTCPD: return GSBI_IX86_BUILTIN_VTESTCPD;
+    case IX86_BUILTIN_VTESTCPD256:      return GSBI_IX86_BUILTIN_VTESTCPD256;
+    case IX86_BUILTIN_VTESTCPS: return GSBI_IX86_BUILTIN_VTESTCPS;
+    case IX86_BUILTIN_VTESTCPS256:      return GSBI_IX86_BUILTIN_VTESTCPS256;
+    case IX86_BUILTIN_VTESTNZCPD:       return GSBI_IX86_BUILTIN_VTESTNZCPD;
+    case IX86_BUILTIN_VTESTNZCPD256:    return GSBI_IX86_BUILTIN_VTESTNZCPD256;
+    case IX86_BUILTIN_VTESTNZCPS:       return GSBI_IX86_BUILTIN_VTESTNZCPS;
+    case IX86_BUILTIN_VTESTNZCPS256:    return GSBI_IX86_BUILTIN_VTESTNZCPS256;
+    case IX86_BUILTIN_VTESTZPD: return GSBI_IX86_BUILTIN_VTESTZPD;
+    case IX86_BUILTIN_VTESTZPD256:      return GSBI_IX86_BUILTIN_VTESTZPD256;
+    case IX86_BUILTIN_VTESTZPS: return GSBI_IX86_BUILTIN_VTESTZPS;
+    case IX86_BUILTIN_VTESTZPS256:      return GSBI_IX86_BUILTIN_VTESTZPS256;
+    case IX86_BUILTIN_VZEROALL: return GSBI_IX86_BUILTIN_VZEROALL;
+    case IX86_BUILTIN_VZEROUPPER:       return GSBI_IX86_BUILTIN_VZEROUPPER;
+    case IX86_BUILTIN_XORPD256: return GSBI_IX86_BUILTIN_XORPD256;
+    case IX86_BUILTIN_XORPS256: return GSBI_IX86_BUILTIN_XORPS256;
+
+    /* FMA4 intrinsics */
+    case IX86_BUILTIN_VFMADDPD: return GSBI_IX86_BUILTIN_VFMADDPD;
+    case IX86_BUILTIN_VFMADDPD256:      return GSBI_IX86_BUILTIN_VFMADDPD256;
+    case IX86_BUILTIN_VFMADDPS: return GSBI_IX86_BUILTIN_VFMADDPS;
+    case IX86_BUILTIN_VFMADDPS256:      return GSBI_IX86_BUILTIN_VFMADDPS256;
+    case IX86_BUILTIN_VFMADDSD: return GSBI_IX86_BUILTIN_VFMADDSD;
+    case IX86_BUILTIN_VFMADDSS: return GSBI_IX86_BUILTIN_VFMADDSS;
+    case IX86_BUILTIN_VFMADDSUBPD:      return GSBI_IX86_BUILTIN_VFMADDSUBPD;
+    case IX86_BUILTIN_VFMADDSUBPD256:   return GSBI_IX86_BUILTIN_VFMADDSUBPD256;
+    case IX86_BUILTIN_VFMADDSUBPS:      return GSBI_IX86_BUILTIN_VFMADDSUBPS;
+    case IX86_BUILTIN_VFMADDSUBPS256:   return GSBI_IX86_BUILTIN_VFMADDSUBPS256;
+    case IX86_BUILTIN_VFMSUBADDPD:      return GSBI_IX86_BUILTIN_VFMSUBADDPD;
+    case IX86_BUILTIN_VFMSUBADDPD256:   return GSBI_IX86_BUILTIN_VFMSUBADDPD256;
+    case IX86_BUILTIN_VFMSUBADDPS:      return GSBI_IX86_BUILTIN_VFMSUBADDPS;
+    case IX86_BUILTIN_VFMSUBADDPS256:   return GSBI_IX86_BUILTIN_VFMSUBADDPS256;
+    case IX86_BUILTIN_VFMSUBPD: return GSBI_IX86_BUILTIN_VFMSUBPD;
+    case IX86_BUILTIN_VFMSUBPD256:      return GSBI_IX86_BUILTIN_VFMSUBPD256;
+    case IX86_BUILTIN_VFMSUBPS: return GSBI_IX86_BUILTIN_VFMSUBPS;
+    case IX86_BUILTIN_VFMSUBPS256:      return GSBI_IX86_BUILTIN_VFMSUBPS256;
+    case IX86_BUILTIN_VFMSUBSD: return GSBI_IX86_BUILTIN_VFMSUBSD;
+    case IX86_BUILTIN_VFMSUBSS: return GSBI_IX86_BUILTIN_VFMSUBSS;
+    case IX86_BUILTIN_VFNMADDPD:        return GSBI_IX86_BUILTIN_VFNMADDPD;
+    case IX86_BUILTIN_VFNMADDPD256:     return GSBI_IX86_BUILTIN_VFNMADDPD256;
+    case IX86_BUILTIN_VFNMADDPS:        return GSBI_IX86_BUILTIN_VFNMADDPS;
+    case IX86_BUILTIN_VFNMADDPS256:     return GSBI_IX86_BUILTIN_VFNMADDPS256;
+    case IX86_BUILTIN_VFNMADDSD:        return GSBI_IX86_BUILTIN_VFNMADDSD;
+    case IX86_BUILTIN_VFNMADDSS:        return GSBI_IX86_BUILTIN_VFNMADDSS;
+    case IX86_BUILTIN_VFNMSUBPD:        return GSBI_IX86_BUILTIN_VFNMSUBPD;
+    case IX86_BUILTIN_VFNMSUBPD256:     return GSBI_IX86_BUILTIN_VFNMSUBPD256;
+    case IX86_BUILTIN_VFNMSUBPS:        return GSBI_IX86_BUILTIN_VFNMSUBPS;
+    case IX86_BUILTIN_VFNMSUBPS256:     return GSBI_IX86_BUILTIN_VFNMSUBPS256;
+    case IX86_BUILTIN_VFNMSUBSD:        return GSBI_IX86_BUILTIN_VFNMSUBSD;
+    case IX86_BUILTIN_VFNMSUBSS:        return GSBI_IX86_BUILTIN_VFNMSUBSS;
+
+    /* XOP intrinsics */
+    case IX86_BUILTIN_VFRCZPD:  return GSBI_IX86_BUILTIN_VFRCZPD;
+    case IX86_BUILTIN_VFRCZPD256:       return GSBI_IX86_BUILTIN_VFRCZPD256;
+    case IX86_BUILTIN_VFRCZPS:  return GSBI_IX86_BUILTIN_VFRCZPS;
+    case IX86_BUILTIN_VFRCZPS256:       return GSBI_IX86_BUILTIN_VFRCZPS256;
+    case IX86_BUILTIN_VFRCZSD:  return GSBI_IX86_BUILTIN_VFRCZSD;
+    case IX86_BUILTIN_VFRCZSS:  return GSBI_IX86_BUILTIN_VFRCZSS;
+    case IX86_BUILTIN_VPCMOV:   return GSBI_IX86_BUILTIN_VPCMOV;
+    case IX86_BUILTIN_VPCMOV256:        return GSBI_IX86_BUILTIN_VPCMOV256;
+    case IX86_BUILTIN_VPCMOV_V16HI256:  return GSBI_IX86_BUILTIN_VPCMOV_V16HI256;
+    case IX86_BUILTIN_VPCMOV_V16QI:     return GSBI_IX86_BUILTIN_VPCMOV_V16QI;
+    case IX86_BUILTIN_VPCMOV_V2DF:      return GSBI_IX86_BUILTIN_VPCMOV_V2DF;
+    case IX86_BUILTIN_VPCMOV_V2DI:      return GSBI_IX86_BUILTIN_VPCMOV_V2DI;
+    case IX86_BUILTIN_VPCMOV_V32QI256:  return GSBI_IX86_BUILTIN_VPCMOV_V32QI256;
+    case IX86_BUILTIN_VPCMOV_V4DF256:   return GSBI_IX86_BUILTIN_VPCMOV_V4DF256;
+    case IX86_BUILTIN_VPCMOV_V4DI256:   return GSBI_IX86_BUILTIN_VPCMOV_V4DI256;
+    case IX86_BUILTIN_VPCMOV_V4SF:      return GSBI_IX86_BUILTIN_VPCMOV_V4SF;
+    case IX86_BUILTIN_VPCMOV_V4SI:      return GSBI_IX86_BUILTIN_VPCMOV_V4SI;
+    case IX86_BUILTIN_VPCMOV_V8HI:      return GSBI_IX86_BUILTIN_VPCMOV_V8HI;
+    case IX86_BUILTIN_VPCMOV_V8SF256:   return GSBI_IX86_BUILTIN_VPCMOV_V8SF256;
+    case IX86_BUILTIN_VPCMOV_V8SI256:   return GSBI_IX86_BUILTIN_VPCMOV_V8SI256;
+    case IX86_BUILTIN_VPCOMEQB: return GSBI_IX86_BUILTIN_VPCOMEQB;
+    case IX86_BUILTIN_VPCOMEQD: return GSBI_IX86_BUILTIN_VPCOMEQD;
+    case IX86_BUILTIN_VPCOMEQQ: return GSBI_IX86_BUILTIN_VPCOMEQQ;
+    case IX86_BUILTIN_VPCOMEQUB:        return GSBI_IX86_BUILTIN_VPCOMEQUB;
+    case IX86_BUILTIN_VPCOMEQUD:        return GSBI_IX86_BUILTIN_VPCOMEQUD;
+    case IX86_BUILTIN_VPCOMEQUQ:        return GSBI_IX86_BUILTIN_VPCOMEQUQ;
+    case IX86_BUILTIN_VPCOMEQUW:        return GSBI_IX86_BUILTIN_VPCOMEQUW;
+    case IX86_BUILTIN_VPCOMEQW: return GSBI_IX86_BUILTIN_VPCOMEQW;
+    case IX86_BUILTIN_VPCOMFALSEB:      return GSBI_IX86_BUILTIN_VPCOMFALSEB;
+    case IX86_BUILTIN_VPCOMFALSED:      return GSBI_IX86_BUILTIN_VPCOMFALSED;
+    case IX86_BUILTIN_VPCOMFALSEQ:      return GSBI_IX86_BUILTIN_VPCOMFALSEQ;
+    case IX86_BUILTIN_VPCOMFALSEUB:     return GSBI_IX86_BUILTIN_VPCOMFALSEUB;
+    case IX86_BUILTIN_VPCOMFALSEUD:     return GSBI_IX86_BUILTIN_VPCOMFALSEUD;
+    case IX86_BUILTIN_VPCOMFALSEUQ:     return GSBI_IX86_BUILTIN_VPCOMFALSEUQ;
+    case IX86_BUILTIN_VPCOMFALSEUW:     return GSBI_IX86_BUILTIN_VPCOMFALSEUW;
+    case IX86_BUILTIN_VPCOMFALSEW:      return GSBI_IX86_BUILTIN_VPCOMFALSEW;
+    case IX86_BUILTIN_VPCOMGEB: return GSBI_IX86_BUILTIN_VPCOMGEB;
+    case IX86_BUILTIN_VPCOMGED: return GSBI_IX86_BUILTIN_VPCOMGED;
+    case IX86_BUILTIN_VPCOMGEQ: return GSBI_IX86_BUILTIN_VPCOMGEQ;
+    case IX86_BUILTIN_VPCOMGEUB:        return GSBI_IX86_BUILTIN_VPCOMGEUB;
+    case IX86_BUILTIN_VPCOMGEUD:        return GSBI_IX86_BUILTIN_VPCOMGEUD;
+    case IX86_BUILTIN_VPCOMGEUQ:        return GSBI_IX86_BUILTIN_VPCOMGEUQ;
+    case IX86_BUILTIN_VPCOMGEUW:        return GSBI_IX86_BUILTIN_VPCOMGEUW;
+    case IX86_BUILTIN_VPCOMGEW: return GSBI_IX86_BUILTIN_VPCOMGEW;
+    case IX86_BUILTIN_VPCOMGTB: return GSBI_IX86_BUILTIN_VPCOMGTB;
+    case IX86_BUILTIN_VPCOMGTD: return GSBI_IX86_BUILTIN_VPCOMGTD;
+    case IX86_BUILTIN_VPCOMGTQ: return GSBI_IX86_BUILTIN_VPCOMGTQ;
+    case IX86_BUILTIN_VPCOMGTUB:        return GSBI_IX86_BUILTIN_VPCOMGTUB;
+    case IX86_BUILTIN_VPCOMGTUD:        return GSBI_IX86_BUILTIN_VPCOMGTUD;
+    case IX86_BUILTIN_VPCOMGTUQ:        return GSBI_IX86_BUILTIN_VPCOMGTUQ;
+    case IX86_BUILTIN_VPCOMGTUW:        return GSBI_IX86_BUILTIN_VPCOMGTUW;
+    case IX86_BUILTIN_VPCOMGTW: return GSBI_IX86_BUILTIN_VPCOMGTW;
+    case IX86_BUILTIN_VPCOMLEB: return GSBI_IX86_BUILTIN_VPCOMLEB;
+    case IX86_BUILTIN_VPCOMLED: return GSBI_IX86_BUILTIN_VPCOMLED;
+    case IX86_BUILTIN_VPCOMLEQ: return GSBI_IX86_BUILTIN_VPCOMLEQ;
+    case IX86_BUILTIN_VPCOMLEUB:        return GSBI_IX86_BUILTIN_VPCOMLEUB;
+    case IX86_BUILTIN_VPCOMLEUD:        return GSBI_IX86_BUILTIN_VPCOMLEUD;
+    case IX86_BUILTIN_VPCOMLEUQ:        return GSBI_IX86_BUILTIN_VPCOMLEUQ;
+    case IX86_BUILTIN_VPCOMLEUW:        return GSBI_IX86_BUILTIN_VPCOMLEUW;
+    case IX86_BUILTIN_VPCOMLEW: return GSBI_IX86_BUILTIN_VPCOMLEW;
+    case IX86_BUILTIN_VPCOMLTB: return GSBI_IX86_BUILTIN_VPCOMLTB;
+    case IX86_BUILTIN_VPCOMLTD: return GSBI_IX86_BUILTIN_VPCOMLTD;
+    case IX86_BUILTIN_VPCOMLTQ: return GSBI_IX86_BUILTIN_VPCOMLTQ;
+    case IX86_BUILTIN_VPCOMLTUB:        return GSBI_IX86_BUILTIN_VPCOMLTUB;
+    case IX86_BUILTIN_VPCOMLTUD:        return GSBI_IX86_BUILTIN_VPCOMLTUD;
+    case IX86_BUILTIN_VPCOMLTUQ:        return GSBI_IX86_BUILTIN_VPCOMLTUQ;
+    case IX86_BUILTIN_VPCOMLTUW:        return GSBI_IX86_BUILTIN_VPCOMLTUW;
+    case IX86_BUILTIN_VPCOMLTW: return GSBI_IX86_BUILTIN_VPCOMLTW;
+    case IX86_BUILTIN_VPCOMNEB: return GSBI_IX86_BUILTIN_VPCOMNEB;
+    case IX86_BUILTIN_VPCOMNED: return GSBI_IX86_BUILTIN_VPCOMNED;
+    case IX86_BUILTIN_VPCOMNEQ: return GSBI_IX86_BUILTIN_VPCOMNEQ;
+    case IX86_BUILTIN_VPCOMNEUB:        return GSBI_IX86_BUILTIN_VPCOMNEUB;
+    case IX86_BUILTIN_VPCOMNEUD:        return GSBI_IX86_BUILTIN_VPCOMNEUD;
+    case IX86_BUILTIN_VPCOMNEUQ:        return GSBI_IX86_BUILTIN_VPCOMNEUQ;
+    case IX86_BUILTIN_VPCOMNEUW:        return GSBI_IX86_BUILTIN_VPCOMNEUW;
+    case IX86_BUILTIN_VPCOMNEW: return GSBI_IX86_BUILTIN_VPCOMNEW;
+    case IX86_BUILTIN_VPCOMTRUEB:       return GSBI_IX86_BUILTIN_VPCOMTRUEB;
+    case IX86_BUILTIN_VPCOMTRUED:       return GSBI_IX86_BUILTIN_VPCOMTRUED;
+    case IX86_BUILTIN_VPCOMTRUEQ:       return GSBI_IX86_BUILTIN_VPCOMTRUEQ;
+    case IX86_BUILTIN_VPCOMTRUEUB:      return GSBI_IX86_BUILTIN_VPCOMTRUEUB;
+    case IX86_BUILTIN_VPCOMTRUEUD:      return GSBI_IX86_BUILTIN_VPCOMTRUEUD;
+    case IX86_BUILTIN_VPCOMTRUEUQ:      return GSBI_IX86_BUILTIN_VPCOMTRUEUQ;
+    case IX86_BUILTIN_VPCOMTRUEUW:      return GSBI_IX86_BUILTIN_VPCOMTRUEUW;
+    case IX86_BUILTIN_VPCOMTRUEW:       return GSBI_IX86_BUILTIN_VPCOMTRUEW;
+    case IX86_BUILTIN_VPHADDBD: return GSBI_IX86_BUILTIN_VPHADDBD;
+    case IX86_BUILTIN_VPHADDBQ: return GSBI_IX86_BUILTIN_VPHADDBQ;
+    case IX86_BUILTIN_VPHADDBW: return GSBI_IX86_BUILTIN_VPHADDBW;
+    case IX86_BUILTIN_VPHADDDQ: return GSBI_IX86_BUILTIN_VPHADDDQ;
+    case IX86_BUILTIN_VPHADDUBD:        return GSBI_IX86_BUILTIN_VPHADDUBD;
+    case IX86_BUILTIN_VPHADDUBQ:        return GSBI_IX86_BUILTIN_VPHADDUBQ;
+    case IX86_BUILTIN_VPHADDUBW:        return GSBI_IX86_BUILTIN_VPHADDUBW;
+    case IX86_BUILTIN_VPHADDUDQ:        return GSBI_IX86_BUILTIN_VPHADDUDQ;
+    case IX86_BUILTIN_VPHADDUWD:        return GSBI_IX86_BUILTIN_VPHADDUWD;
+    case IX86_BUILTIN_VPHADDUWQ:        return GSBI_IX86_BUILTIN_VPHADDUWQ;
+    case IX86_BUILTIN_VPHADDWD: return GSBI_IX86_BUILTIN_VPHADDWD;
+    case IX86_BUILTIN_VPHADDWQ: return GSBI_IX86_BUILTIN_VPHADDWQ;
+    case IX86_BUILTIN_VPHSUBBW: return GSBI_IX86_BUILTIN_VPHSUBBW;
+    case IX86_BUILTIN_VPHSUBDQ: return GSBI_IX86_BUILTIN_VPHSUBDQ;
+    case IX86_BUILTIN_VPHSUBWD: return GSBI_IX86_BUILTIN_VPHSUBWD;
+    case IX86_BUILTIN_VPMACSDD: return GSBI_IX86_BUILTIN_VPMACSDD;
+    case IX86_BUILTIN_VPMACSDQH:        return GSBI_IX86_BUILTIN_VPMACSDQH;
+    case IX86_BUILTIN_VPMACSDQL:        return GSBI_IX86_BUILTIN_VPMACSDQL;
+    case IX86_BUILTIN_VPMACSSDD:        return GSBI_IX86_BUILTIN_VPMACSSDD;
+    case IX86_BUILTIN_VPMACSSDQH:       return GSBI_IX86_BUILTIN_VPMACSSDQH;
+    case IX86_BUILTIN_VPMACSSDQL:       return GSBI_IX86_BUILTIN_VPMACSSDQL;
+    case IX86_BUILTIN_VPMACSSWD:        return GSBI_IX86_BUILTIN_VPMACSSWD;
+    case IX86_BUILTIN_VPMACSSWW:        return GSBI_IX86_BUILTIN_VPMACSSWW;
+    case IX86_BUILTIN_VPMACSWD: return GSBI_IX86_BUILTIN_VPMACSWD;
+    case IX86_BUILTIN_VPMACSWW: return GSBI_IX86_BUILTIN_VPMACSWW;
+    case IX86_BUILTIN_VPMADCSSWD:       return GSBI_IX86_BUILTIN_VPMADCSSWD;
+    case IX86_BUILTIN_VPMADCSWD:        return GSBI_IX86_BUILTIN_VPMADCSWD;
+    case IX86_BUILTIN_VPPERM:   return GSBI_IX86_BUILTIN_VPPERM;
+    case IX86_BUILTIN_VPROTB:   return GSBI_IX86_BUILTIN_VPROTB;
+    case IX86_BUILTIN_VPROTB_IMM:       return GSBI_IX86_BUILTIN_VPROTB_IMM;
+    case IX86_BUILTIN_VPROTD:   return GSBI_IX86_BUILTIN_VPROTD;
+    case IX86_BUILTIN_VPROTD_IMM:       return GSBI_IX86_BUILTIN_VPROTD_IMM;
+    case IX86_BUILTIN_VPROTQ:   return GSBI_IX86_BUILTIN_VPROTQ;
+    case IX86_BUILTIN_VPROTQ_IMM:       return GSBI_IX86_BUILTIN_VPROTQ_IMM;
+    case IX86_BUILTIN_VPROTW:   return GSBI_IX86_BUILTIN_VPROTW;
+    case IX86_BUILTIN_VPROTW_IMM:       return GSBI_IX86_BUILTIN_VPROTW_IMM;
+    case IX86_BUILTIN_VPSHAB:   return GSBI_IX86_BUILTIN_VPSHAB;
+    case IX86_BUILTIN_VPSHAD:   return GSBI_IX86_BUILTIN_VPSHAD;
+    case IX86_BUILTIN_VPSHAQ:   return GSBI_IX86_BUILTIN_VPSHAQ;
+    case IX86_BUILTIN_VPSHAW:   return GSBI_IX86_BUILTIN_VPSHAW;
+    case IX86_BUILTIN_VPSHLB:   return GSBI_IX86_BUILTIN_VPSHLB;
+    case IX86_BUILTIN_VPSHLD:   return GSBI_IX86_BUILTIN_VPSHLD;
+    case IX86_BUILTIN_VPSHLQ:   return GSBI_IX86_BUILTIN_VPSHLQ;
+    case IX86_BUILTIN_VPSHLW:   return GSBI_IX86_BUILTIN_VPSHLW;
+
+    case IX86_BUILTIN_MAX: return GSBI_IX86_BUILTIN_MAX;
+  }
+  gcc_assert (0);
+  return (gsbi_ts_t) 0;
+}
+#endif
+
+static inline gs_omp_clause_code_t
+gcc_omp_clause_code2gs_occ (enum omp_clause_code c)
+{
+  switch (c)
+  {
+    case OMP_CLAUSE_ERROR: return GS_OMP_CLAUSE_ERROR;
+    case OMP_CLAUSE_PRIVATE: return GS_OMP_CLAUSE_PRIVATE;
+    case OMP_CLAUSE_SHARED: return GS_OMP_CLAUSE_SHARED;
+    case OMP_CLAUSE_FIRSTPRIVATE: return GS_OMP_CLAUSE_FIRSTPRIVATE;
+    case OMP_CLAUSE_LASTPRIVATE: return GS_OMP_CLAUSE_LASTPRIVATE;
+    case OMP_CLAUSE_REDUCTION: return GS_OMP_CLAUSE_REDUCTION;
+    case OMP_CLAUSE_COPYIN: return GS_OMP_CLAUSE_COPYIN;
+    case OMP_CLAUSE_COPYPRIVATE: return GS_OMP_CLAUSE_COPYPRIVATE;
+    case OMP_CLAUSE_IF: return GS_OMP_CLAUSE_IF;
+    case OMP_CLAUSE_NUM_THREADS: return GS_OMP_CLAUSE_NUM_THREADS;
+    case OMP_CLAUSE_SCHEDULE: return GS_OMP_CLAUSE_SCHEDULE;
+    case OMP_CLAUSE_NOWAIT: return GS_OMP_CLAUSE_NOWAIT;
+    case OMP_CLAUSE_ORDERED: return GS_OMP_CLAUSE_ORDERED;
+    case OMP_CLAUSE_DEFAULT: return GS_OMP_CLAUSE_DEFAULT;
+  }
+  gcc_assert (0);
+  return (gsbi_ts_t) 0;
+}
+
+static inline gs_omp_clause_default_kind_t
+gcc_omp_clause_default_kind2gs_ocdk (enum omp_clause_default_kind k)
+{
+  switch (k)
+  {
+    case OMP_CLAUSE_DEFAULT_UNSPECIFIED:
+         return GS_OMP_CLAUSE_DEFAULT_UNSPECIFIED;
+    case OMP_CLAUSE_DEFAULT_SHARED: return GS_OMP_CLAUSE_DEFAULT_SHARED;
+    case OMP_CLAUSE_DEFAULT_NONE: return GS_OMP_CLAUSE_DEFAULT_NONE;
+    case OMP_CLAUSE_DEFAULT_PRIVATE: return GS_OMP_CLAUSE_DEFAULT_PRIVATE;
+  }
+  gcc_assert (0);
+  return (gsbi_ts_t) 0;
+}
+
+static inline gs_omp_clause_schedule_kind_t
+gcc_omp_clause_schedule_kind2gs_ocsk (enum omp_clause_schedule_kind k)
+{
+  switch (k)
+  {
+    case OMP_CLAUSE_SCHEDULE_STATIC: return GS_OMP_CLAUSE_SCHEDULE_STATIC;
+    case OMP_CLAUSE_SCHEDULE_DYNAMIC: return GS_OMP_CLAUSE_SCHEDULE_DYNAMIC;
+    case OMP_CLAUSE_SCHEDULE_GUIDED: return GS_OMP_CLAUSE_SCHEDULE_GUIDED;
+    case OMP_CLAUSE_SCHEDULE_RUNTIME: return GS_OMP_CLAUSE_SCHEDULE_RUNTIME;
+  }
+  gcc_assert (0);
+  return (gsbi_ts_t) 0;
+}
+
+/******************************************************************************/
+
+unsigned int gspin_label_count = 0;
+
+/* C++: Are we processing the final global namespace? */
+int processing_global_namespace = 0;
+/* Function prototypes */
+gs_t gs_x (tree node);
+gs_t gs_x_func_decl (tree node);
+void gspin_gxx_emits_decl (tree t);
+void gspin_gxx_emits_asm (tree str);
+void gspin_write (void);
+void gspin_init (void);
+void gspin_init_global_trees_list (void);
+int gspin_invoked (tree t);
+void gs_set_flag_value (tree t, unsigned int flag, bool value);
+void dump_statement_list (tree t);
+static void gspin_add_weak (tree decl, gs_t decl_node);
+
+int    gs_argc;
+char **gs_argv;
+
+static gs_t program   = (gs_t) NULL, 
+            arg_list  = (gs_t) NULL,
+            global_trees_list  = (gs_t) NULL,
+            integer_types_list  = (gs_t) NULL,
+	    gxx_emitted_decls_dot = (gs_t) NULL,
+	    gxx_emitted_asms_dot = (gs_t) NULL,
+	    weak_decls_dot = (gs_t) NULL,
+	    gs_program_flags = (gs_t) NULL;
+
+/* dot to insert new declaration tree */
+static gs_t program_decls_dot = (gs_t) NULL;
+
+void gspin_write (void) 
+{
+  /* Bug 10172: If errors have occurred, do not write out the .spin output file. */
+  if (!errorcount)
+    gs_write ((gs_string_t) spin_file_name);
+}
+
+/* Return 1 if gspin has been invoked already and this node has been
+ * processed, else return 0.
+ */
+int gspin_invoked (tree t)
+{
+  return program != NULL && ((gs_t)GS_NODE(t) != NULL);
+}
+
+/* Set FLAG in gs_t of T with VALUE.
+ * It is the caller's responsibility to verify that T has already been
+ * translated into gs_t.
+ * The caller should also ensure FLAG is a flag in the GS_FLAGS section.
+ * The flag is set if the gs_t node already contains flag information.
+ * If there is no flag information, the node must be in the early
+ * stages of creation, and it is no use setting the flag here.
+ */
+void gs_set_flag_value (tree t, unsigned int flag, bool value)
+{
+    gs_t gs_flags = gs_operand((gs_t)GS_NODE(t), GS_FLAGS);
+    if (gs_flags == NULL) {
+      gs_flags = __gs (IB_BIT_VECTOR);
+      gs_set_operand((gs_t) GS_NODE (t), GS_FLAGS, gs_flags);
+    }
+    if (value)
+      _gs_bv (gs_flags, flag, 1);
+    else
+      _gs_bv_reset (gs_flags, flag);
+}
+
+void gs_set_program_flag_value (unsigned int flag, bool value)
+{
+  gs_t program_flags = gs_operand((gs_t)program, GS_PROGRAM_FLAGS);
+  GS_ASSERT(program_flags != NULL,
+   ("gs_set_program_flag_value should be called after gspin initialization"));
+  if (value)
+    _gs_bv (program_flags, flag, 1);
+  else
+    _gs_bv_reset (program_flags, flag);
+}
+
+/* Initialize the gspin dot universe. */
+void
+gspin_init(void)
+{
+  gs_t arg, decl_list;
+  gs_int_t i;
+  gs_t gxx_emitted_decls, gxx_emitted_asms, weak_decls;
+  
+  GS_ASSERT(program == NULL,
+	    ("gspin_init: dot universe already initialized"));
+
+  /* First find out and flag the kind of translation run. */
+  if (strcmp ("GNU C++", lang_hooks.name) == 0) {
+    language = CPP;
+  }
+  else if (strcmp ("GNU C", lang_hooks.name) == 0) {
+    language = C;
+  }
+
+  /*
+     Create the dot structure for GS_PROGRAM.
+    
+                           root dot
+			       / \
+			      .   weak decls		GS_PROGRAM arg7
+                             / \
+                            .   program flags		GS_PROGRAM arg6
+                           / \
+                          .   gxx-emitted asms		GS_PROGRAM arg5
+                         / \
+                        .   gxx-emitted decls		GS_PROGRAM arg4
+                       / \
+                      .   program declarations		GS_PROGRAM arg3
+                     / \
+                    .   integer types list		GS_PROGRAM arg2
+                   / \
+                  .   global trees list			GS_PROGRAM arg1
+                 / \
+       GS_PROGRAM   cc1 command line args		GS_PROGRAM arg0
+  */
+
+  program = __gs (GS_PROGRAM);
+
+  /* cc1 command line args */
+  arg_list  = __gs (EMPTY);
+  // append cwd "-w $cwd" in reverse order
+  arg = __gs (IB_STRING);
+  _gs_s (arg, (gs_string_t)get_src_pwd(), 1 + strlen (get_src_pwd()));
+  arg_list = gs_cons (arg, arg_list);
+  arg = __gs (IB_STRING);
+  _gs_s (arg, (gs_string_t)"-w", 3);
+  arg_list = gs_cons (arg, arg_list);
+  // end cwd
+  for (i = gs_argc - 1; i >= 0; i--) {
+    arg = __gs (IB_STRING);
+    _gs_s (arg, (gs_string_t)gs_argv[i], 1 + strlen (gs_argv[i]));
+    arg_list = gs_cons (arg, arg_list);
+  }
+  gs_set_operand(program, GS_CC1_COMMAND_LINE_ARGS, arg_list);
+
+  /* global trees list will be initialized by gspin_init_global_trees_list */
+
+  /* integer types list will be initialized by gspin_init_global_trees_list */
+
+  /* program declarations */
+  decl_list = __gs (EMPTY);
+  gs_set_operand(program, GS_PROGRAM_DECLARATIONS, decl_list);
+  program_decls_dot = decl_list;
+
+  /* gxx-emitted decls */
+  gxx_emitted_decls = __gs (EMPTY);
+  gs_set_operand(program, GS_GXX_EMITTED_DECLS, gxx_emitted_decls);
+  gxx_emitted_decls_dot = gxx_emitted_decls;
+
+  /* gxx-emitted asms */
+  gxx_emitted_asms = __gs (EMPTY);
+  gs_set_operand(program, GS_GXX_EMITTED_ASMS, gxx_emitted_asms);
+  gxx_emitted_asms_dot = gxx_emitted_asms;
+
+  /* program flags */
+  gs_program_flags = __gs(IB_BIT_VECTOR);
+  gs_set_operand(program, GS_PROGRAM_FLAGS, gs_program_flags);
+  _gs_bv(gs_program_flags, GS_FLAG_ERRNO_MATH, flag_errno_math);
+
+  /* weak decls */
+  weak_decls = __gs (EMPTY);
+  gs_set_operand(program, GS_WEAK_DECLS, weak_decls);
+  weak_decls_dot = weak_decls;
+
+  if ((atexit (gspin_write)) != 0) 
+    fprintf (stderr, "gspin_write registration with atexit (3) failed.\n");
+}
+
+/* Add the global trees containing common types. */
+void
+gspin_init_global_trees_list(void)
+{
+  int i;
+
+  global_trees_list = __gs (EMPTY);
+  for (i = TI_MAX - 1; i >= TI_ERROR_MARK; i--) {
+#ifdef TARG_X8664
+    GS_ASSERT((global_trees[i] != NULL) ||
+              (!TARGET_64BIT &&
+               (i == TI_VA_LIST_GPR_COUNTER_FIELD ||
+                i == TI_VA_LIST_FPR_COUNTER_FIELD)),
+              ("gspin_init_global_trees_list: global_tree not initialized"));
+#else
+    GS_ASSERT((global_trees[i] != NULL) ||
+              ((i == TI_VA_LIST_GPR_COUNTER_FIELD ||
+                i == TI_VA_LIST_FPR_COUNTER_FIELD)),
+              ("gspin_init_global_trees_list: global_tree not initialized"));
+#endif
+    global_trees_list = gs_cons (gs_x (global_trees [i]), global_trees_list);
+  }
+  gs_set_operand(program, GS_GLOBAL_TREES_LIST, global_trees_list);
+
+  integer_types_list = __gs (EMPTY);
+  for (i = itk_none - 1; i >= itk_char; i--) {
+    integer_types_list = gs_cons (gs_x (integer_types [i]), integer_types_list);
+  }
+  gs_set_operand(program, GS_INTEGER_TYPES_LIST, integer_types_list);
+}
+
+/* Add tree T to the program's decls list. */
+void
+gspin (tree t) 
+{
+  gs_t decl, decl_list;
+
+  /* C++ should call gs_x_func_decl to translate FUNCTION_DECL. */
+  if (CPR()) {
+    GS_ASSERT(t == NULL ||
+	      TREE_CODE(t) != FUNCTION_DECL,
+	      ("gspin: C++ should not call gspin for FUNCTION_DECL"));
+  }
+  
+  GS_ASSERT(program != NULL, ("gspin: gspin not initialized"));
+
+  decl = gs_x_func_decl(t);
+
+  if (gs_code(program_decls_dot) == EMPTY) {
+    _gs_code(program_decls_dot, CONS);
+    gs_set_operand(program_decls_dot, 0, decl);
+    gs_set_operand(program_decls_dot, 1, __gs(EMPTY));
+    return;
+  }
+  decl_list = gs_cons(decl, gs_operand(program_decls_dot, 1));
+  gs_set_operand(program_decls_dot, 1, decl_list);
+  program_decls_dot = decl_list;
+}
+
+/* Set to 1 by the name-mangling code if the decl cannot be reliably mangled.
+ * This happens when some of the info needed for mangling is missing. */
+int cannot_mangle_name;
+
+/* Tell gs_x_1 whether or not to fully translate FUNCTION_DECL. */
+static int translate_func_decl = 0;
+
+/* The sequence number identifies the tree nodes that are being translated in
+ * the current pass.  Prevents infinite recursion when tree nodes point to each
+ * other. */
+static HOST_WIDE_INT sequence_num = 0;
+
+/* SEQ_NUM is the sequence number for this translation pass. */
+static gs_t
+gs_x_1 (tree t, HOST_WIDE_INT seq_num)
+{
+  enum machine_mode mode;
+  enum tree_code_class class;
+  enum tree_code tcode;
+  int i;
+  int translate_this_func_decl = translate_func_decl;
+  gs_t flags, code_class;
+
+  /* Don't translate FUNCTION_DECLs fully when recursing. */
+  translate_func_decl = 0;
+  
+  if (t == (tree) NULL)
+    return (gs_t) NULL;
+ 
+  /* Do not process the ERROR_MARK code any further. */
+  if (TREE_CODE (t) == ERROR_MARK)
+    return __gs (GS_ERROR_MARK);
+
+  tcode = TREE_CODE(t);
+
+  if ((gs_t) GS_NODE (t) != (gs_t) NULL) {
+
+    /* A caller was in the process of translating this tree node.  Don't
+     * translate it again here, in order to prevent infinite recursion. */
+    if (GS_SEQUENCE_NUM(t) == seq_num) {
+      GS_ASSERT(GS_NODE(t) != NULL, ("gs_x_1: GS_NODE null"));
+      return (gs_t) GS_NODE(t);
+    }
+
+    /* Handle FUNCTION_DECL with extreme care.  It is possible that GCC has not
+     * finished generating the function body (DECL_SAVED_TREE).  This happens,
+     * for example, when we are called to translate the FUNCTION_DECL from a
+     * CALL_EXPR, or when we are chasing down a TREE_CHAIN containing the
+     * FUNCTION_DECL.  The solution is to translate the FUNCTION_DECL in two
+     * steps:
+     *   1)  Body not yet generated by GCC:
+     *	     Partially construct the gs node for the FUNCTION_DECL so that the
+     *	     node ID can be returned to the caller.  The partially-constructed
+     *	     node has minimal info to keep gspin from breaking.
+     *   2)  Body fully generated by GCC:
+     *	     Finish constructing the rest of the gs node.  This step should be
+     *	     performed *once* from a single GCC call point.  Once the node is
+     *	     fully translated, don't translate it again because GCC may later
+     *	     delete info from the FUNCTION_DECL, such as the DECL_SAVED_TREE. */
+
+    if (TREE_CODE(t) == FUNCTION_DECL) {
+      /* bug 11311: For C++, it is not always possible to determine if a
+       * function will need a body or not. So previously we may have fully
+       * translated a function without its body. If we have
+       * "translate_this_func_decl" set, it means this is the proper time
+       * to expand this function, and it may now have a function body --
+       * whatever is the state of the function_decl, we want to get it now. */
+      if (CPR() && translate_this_func_decl)
+        goto REVISIT;
+      else if (CR()) {
+        /* Don't re-translate the function if it was fully translated before. */
+        if (FULLY_TRANSLATED_TO_GS(t)) {
+          /* This could be an inline function that we have already output
+           * but for which we now see a non-inline definition.  In this case,
+           * we want to translate again to override the previous definition. */
+          if (TRANSLATED_TO_GS_AS_INLINE(t)
+              && ! DECL_INLINE (t) && translate_this_func_decl)
+            TRANSLATED_TO_GS_AS_INLINE(t) = 0;
+          else
+            return GS_NODE(t);
+	}
+
+        /* Node is partially-translated. */
+        if (translate_this_func_decl)
+          goto REVISIT;
+      }
+
+      return GS_NODE(t);
+    }
+
+    if (tcode == VAR_DECL &&
+	DECL_INITIAL (t) != NULL &&
+	DECL_INITIAL (t) != t &&
+        gs_operand((gs_t) GS_NODE(t), GS_DECL_INITIAL) == NULL) {
+      goto REVISIT;
+    }
+
+    if (tcode == VAR_DECL) {
+      gs_t gs_flags = gs_operand((gs_t)GS_NODE(t), GS_FLAGS);
+      if (gs_bv(gs_flags, GS_DECL_EXTERNAL) && !DECL_EXTERNAL(t))
+	goto REVISIT;		/* bug 10324 */
+      if (!gs_bv(gs_flags, GS_TREE_STATIC) && TREE_STATIC(t))
+	goto REVISIT;		/* bug 10324 */
+    }
+
+    if (TREE_CODE_CLASS(tcode) == tcc_type &&
+	(tcode == BOOLEAN_TYPE ||
+	 tcode == COMPLEX_TYPE || tcode == INTEGER_TYPE ||
+	 tcode == REAL_TYPE)) { /* bug 10352 */
+      flags = gs_operand((gs_t)GS_NODE(t), GS_FLAGS);
+      goto REVISIT2;
+    }
+
+    if (tcode == NAMESPACE_DECL && processing_global_namespace) {
+      processing_global_namespace = 0;
+      goto REVISIT;
+    }
+
+    if ((tcode == ARRAY_TYPE || tcode == RECORD_TYPE ||
+         tcode == UNION_TYPE || tcode == QUAL_UNION_TYPE) && 
+	COMPLETE_TYPE_P(t) &&
+        gs_operand((gs_t)GS_NODE(t), GS_TYPE_SIZE) == NULL)
+      goto REVISIT;
+
+    /* bug 14420 */
+    if (tcode == RECORD_TYPE &&
+        TYPE_FIELDS(t) &&
+        gs_operand((gs_t)GS_NODE(t), GS_TYPE_FIELDS) == NULL)
+      goto REVISIT;
+
+    if (tcode == RECORD_TYPE &&
+        CLASS_TYPE_P(t) &&
+        CLASSTYPE_TYPEINFO_VAR(t) &&
+        gs_operand((gs_t) GS_NODE(t), GS_CLASSTYPE_TYPEINFO_VAR) == NULL)
+      goto REVISIT;
+
+    return (gs_t) GS_NODE (t);
+  }
+
+  /* Create the node that will represent this tree node. 
+   * Open64, we use long to represent the pointer */
+  TREE_TO_TRANSLATED_GS (t) = (unsigned long)__gs(gcc2gs (TREE_CODE (t)));
+
+  /* Argument 0 is the name of the class: */
+  class = TREE_CODE_CLASS (TREE_CODE (t));
+  code_class = __gs (GS_TCC);
+  _gs_b (code_class, gcc_class2gs_class (class));
+  gs_set_operand(GS_NODE(t), 0, code_class);
+
+  flags = __gs (IB_BIT_VECTOR);
+  gs_set_operand((gs_t) GS_NODE (t), GS_FLAGS, flags);
+
+  /* Always translate the type because, if it is a FUNCTION_DECL, the front-end
+   * may need the type info even if the rest of the FUNCTION_DECL is never
+   * translated.  (This occurs for a C++ function that is called but does not
+   * appear in the source.  Bug 11123.) */
+  gs_set_operand((gs_t)GS_NODE(t), GS_TREE_TYPE, gs_x_1(TREE_TYPE(t), seq_num));
+
+  /* For the same reason, translate the assembler name.  Create the assembler
+   * name now if it doesn't exist.  Example is __comp_ctor in bug 11123. */
+  if (CPR() &&
+      TREE_CODE(t) == FUNCTION_DECL) {
+    if (!DECL_ASSEMBLER_NAME_SET_P(t)) {
+      cannot_mangle_name = 0;
+      lang_hooks.mangle_decl(t);
+      if (cannot_mangle_name) {
+	/* The decl cannot be reliably mangled.  Delete the possibly wrong
+	 * result. */
+	SET_DECL_ASSEMBLER_NAME(t, NULL);
+      }
+    }
+    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ASSEMBLER_NAME,
+		   gs_x_1(DECL_ASSEMBLER_NAME(t), seq_num));
+#ifdef FE_GNU_4_2_0
+    /* Bug 5737: For C++ (triggered by C++ OpenMP bug), also traverse the
+     * chain node. Otherwise, if TYPE_METHODS initially has a function
+     * without a function body (like a maybe_in_charge_constructor), its
+     * TREE_CHAIN would be empty, thus causing other methods to go missing. */
+    gs_set_operand((gs_t) GS_NODE(t), GS_TREE_CHAIN,
+	           gs_x_1(TREE_CHAIN(t), seq_num));
+#endif
+    _gs_bv(flags, GS_DECL_ASSEMBLER_NAME_SET_P, DECL_ASSEMBLER_NAME_SET_P(t));
+    /* Bug 11224: Also update some flags. Even if the decl is not defined
+     * in this translation unit, it needs to have the proper flags so that
+     * its scope is correctly set. Updating all possible flags here is
+     * difficult. If we don't see this definition, wgen seems to require
+     * two flags. */
+    _gs_bv (flags, GS_TREE_PUBLIC, TREE_PUBLIC (t));
+    _gs_bv (flags, GS_DECL_WEAK, DECL_WEAK (t));
+  }
+
+
+  /* See if the FUNCTION_DECL should be fully or partially translated.  For
+   * bodyless functions such as printf, always translate them fully.  For C++,
+   * a bodyless function will always have a null DECL_SAVED_TREE, even for the
+   * first time we see them here.  (For functions with bodies, DECL_SAVED_TREE
+   * will be non-null up until we are called to translate them, then GCC may
+   * change the DECL_SAVED_TREE to null.)
+   *
+   * For C, a null DECL_SAVED_TREE may mean that the function body has not been
+   * generated by GCC, since we translate C functions one at a time as soon as
+   * each function is finished. */
+
+  if (TREE_CODE(t) == FUNCTION_DECL &&
+      !translate_this_func_decl) {
+    if (CR()) {				/* C */
+      if (!DECL_BUILT_IN(t))
+	return GS_NODE(t);
+    } else {				/* C++ */
+      if ( /* not a bodyless function */
+	  DECL_SAVED_TREE(t) ||
+	  (DECL_LANG_SPECIFIC(t) &&
+	   /* some form of template, whose body GCC will generate later, or */
+	   (DECL_USE_TEMPLATE(t)||
+	   /* a thunk function which will be expanded later */
+	    DECL_THUNK_P(t)))) {
+	return GS_NODE(t);
+      }
+    }
+  }
+
+  REVISIT:
+
+  /* Update sequence number before calling gs_x_1. */
+  GS_SEQUENCE_NUM(t) = seq_num;
+
+  GS_ASSERT(!(TREE_CODE(t) == FUNCTION_DECL &&
+	      FULLY_TRANSLATED_TO_GS(t)) || translate_this_func_decl,
+	    ("gs_x_1: cannot re-translate a fully translated FUNCTION_DECL"));
+  if (!CR() || TREE_CODE(t) != FUNCTION_DECL || 
+      !DECL_BUILT_IN(t) || DECL_SAVED_TREE(t)) { /* bug 14254 */
+    FULLY_TRANSLATED_TO_GS(t) = 1;
+    if (TREE_CODE(t) == FUNCTION_DECL && DECL_INLINE (t))
+      TRANSLATED_TO_GS_AS_INLINE(t) = 1;
+    }
+
+  /* Add common tree fields: TREE_TYPE, TREE_CHAIN, common flags.  Note that
+   * some flags are defined/valid only for certain conditions. */
+
+  gs_set_operand((gs_t) GS_NODE(t), GS_TREE_TYPE, gs_x_1(TREE_TYPE(t), seq_num));
+  gs_set_operand((gs_t) GS_NODE(t), GS_TREE_CHAIN, gs_x_1(TREE_CHAIN(t), seq_num));
+
+  flags = gs_operand((gs_t) GS_NODE(t), GS_FLAGS);
+  GS_ASSERT(flags != NULL, ("gs_x_1: GS_FLAGS NULL"));
+
+  REVISIT2:
+
+  /* Update sequence number before calling gs_x_1. */
+  GS_SEQUENCE_NUM(t) = seq_num;
+
+  if (!TYPE_P (t))
+    _gs_bv (flags, GS_TREE_SIDE_EFFECTS, TREE_SIDE_EFFECTS (t));
+
+  if (TYPE_P (t))
+    _gs_bv (flags, GS_TYPE_READONLY, TYPE_READONLY (t));
+  else
+    _gs_bv (flags, GS_TREE_READONLY, TREE_READONLY (t));
+
+  if (!TYPE_P (t)) 
+    _gs_bv (flags, GS_TREE_CONSTANT, TREE_CONSTANT (t));
+  else if (TYPE_P (t))
+    _gs_bv (flags, GS_TYPE_SIZES_GIMPLIFIED, TYPE_SIZES_GIMPLIFIED (t));
+
+  _gs_bv (flags, GS_TREE_INVARIANT, TREE_INVARIANT (t));
+  _gs_bv (flags, GS_TREE_ADDRESSABLE, TREE_ADDRESSABLE (t));
+  _gs_bv (flags, GS_TREE_THIS_VOLATILE, TREE_THIS_VOLATILE (t));
+  _gs_bv (flags, GS_TREE_ASM_WRITTEN, TREE_ASM_WRITTEN (t));
+  _gs_bv (flags, GS_TREE_USED, TREE_USED (t));
+
+  /* TYPE_P (t) ? " align-ok" : " nothrow" */
+  _gs_bv (flags, GS_TREE_NOTHROW, TREE_NOTHROW (t));
+
+  /* Don't need to set GS_ASM_VOLATILE_P because it shares the same bit field
+   * as GS_TREE_PUBLIC, and GCC's ASM_VOLATILE_P accesses the same flag as
+   * TREE_PUBLIC. */
+  GS_ASSERT(TREE_PUBLIC(t) == ASM_VOLATILE_P(t),
+	    ("gs_x_1: TREE_PUBLIC differs from ASM_VOLATILE"));
+
+  _gs_bv (flags, GS_TREE_PUBLIC, TREE_PUBLIC (t));
+  if (!TREE_PUBLIC (t) && gs_bv(flags, GS_TREE_PUBLIC)) /* bug 13126 */
+    _gs_bv_reset (flags, GS_TREE_PUBLIC);
+  _gs_bv (flags, GS_TREE_PRIVATE, TREE_PRIVATE (t));
+  _gs_bv (flags, GS_TREE_PROTECTED, TREE_PROTECTED (t));
+  _gs_bv (flags, GS_TREE_STATIC, TREE_STATIC (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_0, TREE_LANG_FLAG_0 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_1, TREE_LANG_FLAG_1 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_2, TREE_LANG_FLAG_2 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_3, TREE_LANG_FLAG_3 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_4, TREE_LANG_FLAG_4 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_5, TREE_LANG_FLAG_5 (t));
+  _gs_bv (flags, GS_TREE_LANG_FLAG_6, TREE_LANG_FLAG_6 (t));
+
+  _gs_bv (flags, GS_TREE_NOT_EMITTED_BY_GXX, TREE_NOT_EMITTED_BY_GXX(t));
+
+  /* "enum dwarf_access_attribute" is either 1, 2, or 3.  Use 2 flags to encode
+   * it. */
+  switch (DWARF_ACCESS(t)) {
+    case DW_ACCESS_public:	/* 1 */
+      _gs_bv(flags, GS_DWARF_ACCESS_FLAG_0, 1);
+      break;
+    case DW_ACCESS_protected:	/* 2 */
+      _gs_bv(flags, GS_DWARF_ACCESS_FLAG_1, 1);
+      break;
+    case DW_ACCESS_private:	/* 3 */
+      _gs_bv(flags, GS_DWARF_ACCESS_FLAG_0, 1);
+      _gs_bv(flags, GS_DWARF_ACCESS_FLAG_1, 1);
+      break;
+  }
+
+  switch (TREE_CODE_CLASS (TREE_CODE (t)))
+    {
+    case tcc_declaration:
+
+      _gs_bv (flags, GS_DECL_UNSIGNED, DECL_UNSIGNED (t));
+      _gs_bv (flags, GS_DECL_IGNORED_P, DECL_IGNORED_P (t));
+      _gs_bv (flags, GS_DECL_ABSTRACT, DECL_ABSTRACT (t));
+      _gs_bv (flags, GS_DECL_IN_SYSTEM_HEADER, DECL_IN_SYSTEM_HEADER (t));
+      _gs_bv (flags, GS_DECL_COMMON, DECL_COMMON (t));
+      if (CPR()) {
+	_gs_bv (flags, GS_DECL_EXTERNAL, DECL_EXTERNAL (t));
+	if (! DECL_EXTERNAL(t) && gs_bv(flags, GS_DECL_EXTERNAL))
+	  _gs_bv_reset (flags, GS_DECL_EXTERNAL);
+      } else {
+        if (gs_bv(flags, GS_DECL_COMMON) == 0) /* bug 10324 */
+          _gs_bv (flags, GS_DECL_EXTERNAL, DECL_EXTERNAL (t));
+	/* bugs 10324, 14446 */
+        if (! DECL_EXTERNAL(t) && gs_bv(flags, GS_DECL_EXTERNAL))
+          _gs_bv_reset (flags, GS_DECL_EXTERNAL);
+      }
+      if (DECL_WEAK(t) && 
+	  (TREE_CODE(t) == VAR_DECL ||
+           TREE_CODE(t) == FUNCTION_DECL)) {
+	_gs_bv (flags, GS_DECL_WEAK, DECL_WEAK (t));
+	gspin_add_weak(t, GS_NODE(t));
+      }
+
+      if (TREE_CODE (t) != FIELD_DECL && 
+          TREE_CODE (t) != FUNCTION_DECL && 
+          TREE_CODE (t) != LABEL_DECL)
+        _gs_bv (flags, GS_DECL_REGISTER, DECL_REGISTER (t));
+
+      _gs_bv (flags, GS_DECL_NONLOCAL, DECL_NONLOCAL (t));
+
+      switch (TREE_CODE(t)) {
+	case TYPE_DECL:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ORIGINAL_TYPE,
+		    gs_x_1(DECL_ORIGINAL_TYPE(t), seq_num));
+	  _gs_bv (flags, GS_TYPE_DECL_SUPPRESS_DEBUG,
+		  TYPE_DECL_SUPPRESS_DEBUG (t));
+	  break;
+
+	case FUNCTION_DECL:
+	  {
+	    struct cgraph_node * node = cgraph_node (t);
+	    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_SAVED_TREE,
+		       gs_x_1(DECL_SAVED_TREE(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_RESULT,
+		       gs_x_1(DECL_RESULT(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ARGUMENTS,
+		       gs_x_1(DECL_ARGUMENTS(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_DECL_VINDEX,
+		       gs_x_1(DECL_VINDEX(t), seq_num));
+	    _gs_bv (flags, GS_DECL_INLINE, DECL_INLINE (t));
+	    _gs_bv (flags, GS_DECL_DECLARED_INLINE_P, DECL_DECLARED_INLINE_P (t));
+	    _gs_bv (flags, GS_DECL_BUILT_IN, DECL_BUILT_IN (t));
+	    _gs_bv (flags, GS_DECL_NO_STATIC_CHAIN, DECL_NO_STATIC_CHAIN (t));
+	    /* Set this flag only for C++, because for C it may not always
+	     * be initialized to 0. This flag may also be moved to
+	     * cp_decl_flags. */
+	    if (CPR())
+	      _gs_bv (flags, GS_DECL_THUNK_P, DECL_THUNK_P (t));
+
+	    /* KEY: By default for C++, each function is not "needed" and not
+	     * "reachable" in GNU call graph terminology. That means wgen
+	     * will not emit such functions. These flags are updated during
+	     * GNU call graph analysis.
+	     */
+	    _gs_bv (flags, GS_DECL_NEEDED, node->needed);
+	    _gs_bv (flags, GS_DECL_REACHABLE, node->reachable);
+	  }
+
+	  break;
+
+	case FIELD_DECL:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_FIELD_OFFSET,
+		     gs_x_1(DECL_FIELD_OFFSET(t), seq_num));
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_FIELD_BIT_OFFSET,
+		     gs_x_1(DECL_FIELD_BIT_OFFSET(t), seq_num));
+          _gs_bv (flags, GS_DECL_OFFSET_ALIGN, DECL_OFFSET_ALIGN (t));
+	  _gs_bv (flags, GS_DECL_PACKED, DECL_PACKED (t));
+	  _gs_bv (flags, GS_DECL_BIT_FIELD, DECL_BIT_FIELD (t));
+	  _gs_bv (flags, GS_DECL_NONADDRESSABLE_P, DECL_NONADDRESSABLE_P (t));
+	  break;
+
+	case LABEL_DECL:
+	  {
+	    gs_t label_decl_uid = __gs(IB_INT);
+	    _gs_n(label_decl_uid, gspin_label_count);
+	    gspin_label_count++;
+	    gs_set_operand((gs_t) GS_NODE(t), GS_LABEL_DECL_UID, label_decl_uid);
+	  }
+	  break;
+
+	case VAR_DECL:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_VALUE_EXPR,
+		     gs_x_1(DECL_VALUE_EXPR(t), seq_num));
+	  _gs_bv (flags, GS_DECL_IN_TEXT_SECTION, DECL_IN_TEXT_SECTION (t));
+	  _gs_bv (flags, GS_DECL_THREAD_LOCAL, DECL_THREAD_LOCAL_P (t));
+	  if (TREE_STATIC(t)) {
+	    struct cgraph_varpool_node * var_node = cgraph_varpool_node (t);
+	    _gs_bv (flags, GS_DECL_NEEDED, var_node->needed);
+	  }
+
+	  if (DECL_REGISTER(t) && 
+	      (DECL_HARD_REGISTER(t) || DECL_ASSEMBLER_NAME_SET_P(t))) {
+	    const char *reg_name = IDENTIFIER_POINTER(DECL_ASSEMBLER_NAME(t));
+	    int reg_number = decode_reg_name(&reg_name[1]);
+	    gs_t asmreg = __gs(IB_INT);
+	    _gs_n(asmreg, reg_number);
+	    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ASMREG, asmreg);
+	  }
+	  break;
+
+	case PARM_DECL:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ARG_TYPE,
+		     gs_x_1(DECL_ARG_TYPE(t), seq_num));
+	  gs_set_operand((gs_t) GS_NODE(t), GS_DECL_VALUE_EXPR,
+		     gs_x_1(DECL_VALUE_EXPR(t), seq_num));
+	  break;
+
+	default:
+	  break;
+      }
+
+      _gs_bv (flags, GS_DECL_VIRTUAL_P, DECL_VIRTUAL_P (t));
+
+      _gs_bv (flags, GS_DECL_DEFER_OUTPUT, DECL_DEFER_OUTPUT (t));
+
+      _gs_bv (flags, GS_DECL_PRESERVE_P, DECL_PRESERVE_P (t));
+
+      _gs_bv (flags, GS_DECL_EMITTED_BY_GXX, DECL_EMITTED_BY_GXX (t));
+
+      _gs_bv (flags, GS_DECL_LANG_FLAG_0, DECL_LANG_FLAG_0 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_1, DECL_LANG_FLAG_1 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_2, DECL_LANG_FLAG_2 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_3, DECL_LANG_FLAG_3 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_4, DECL_LANG_FLAG_4 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_5, DECL_LANG_FLAG_5 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_6, DECL_LANG_FLAG_6 (t));
+      _gs_bv (flags, GS_DECL_LANG_FLAG_7, DECL_LANG_FLAG_7 (t));
+
+      /* DECL_NAME */
+      gs_set_operand((gs_t)GS_NODE(t), GS_DECL_NAME, gs_x_1(DECL_NAME(t), seq_num));
+
+      if (gs_operand((gs_t)GS_NODE (t), GS_DECL_UID) == NULL)
+      {
+        /* DECL_UID */
+        gs_t decl_uid = __gs (IB_INT); 
+        _gs_n (decl_uid, DECL_UID (t));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_UID, decl_uid);
+      }
+
+      /* MODE */
+      mode = DECL_MODE (t);
+      if (gs_operand ((gs_t) GS_NODE (t), GS_DECL_MODE) == NULL)
+      {
+        gs_t mode_node;
+        mode_node = __gs (IB_STRING);
+        _gs_s (mode_node, (gs_string_t) GET_MODE_NAME (mode),
+	       1 + strlen (GET_MODE_NAME (mode)));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_MODE, mode_node);
+      }
+
+      /* file */
+      if (gs_operand((gs_t) GS_NODE(t), GS_DECL_SOURCE_FILE) == NULL)
+      {
+        gs_t file = __gs (IB_STRING);
+        _gs_s (file, (gs_string_t) DECL_SOURCE_FILE (t),
+	       1 + strlen (DECL_SOURCE_FILE (t)));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_SOURCE_FILE, file);
+      }
+
+      /* line */
+      if (gs_operand((gs_t) GS_NODE(t), GS_DECL_SOURCE_LINE) == NULL)
+      {
+        gs_t line = __gs (IB_INT);
+        _gs_n (line, DECL_SOURCE_LINE (t));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_SOURCE_LINE, line);
+      }
+
+      /* DECL_SIZE */
+      /* DECL_SIZE_UNIT */
+      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_SIZE,
+		 gs_x_1(DECL_SIZE(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_SIZE_UNIT,
+		 gs_x_1(DECL_SIZE_UNIT(t), seq_num));
+
+      if (TREE_CODE (t) != FUNCTION_DECL) {
+        _gs_bv (flags, GS_DECL_USER_ALIGN, DECL_USER_ALIGN (t));
+      }
+      else if (DECL_BUILT_IN (t)) {
+        gs_t decl_built_in_class, decl_function_code;
+        _gs_bv (flags, GS_DECL_BUILT_IN, DECL_BUILT_IN (t));
+        decl_built_in_class = __gs (GSBI_CLASS);
+        decl_function_code  = __gs (GSBI);
+        _gs_b(decl_built_in_class, gcc_built_in_class2gsbi_class ((int) DECL_BUILT_IN_CLASS (t)));
+        switch (DECL_BUILT_IN_CLASS (t)) {
+          case BUILT_IN_NORMAL:
+            _gs_hword(decl_function_code, gcc_built_in2gsbi ((int) DECL_FUNCTION_CODE (t)));
+            break;
+#ifdef TARG_X8664
+          case BUILT_IN_MD:
+            _gs_hword(decl_function_code, ix86_builtins2gsbi_ts ((int) DECL_FUNCTION_CODE (t)));
+            break;
+#endif
+          default: gcc_assert (0); break;
+        }
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_BUILT_IN_CLASS, decl_built_in_class);
+        gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_FUNCTION_CODE, decl_function_code);
+        /* printf ("BUILT_IN_COMPLEX_MUL_MIN: %d\n", BUILT_IN_COMPLEX_MUL_MIN); */
+        /* printf ("BUILT_IN_COMPLEX_MUL_MAX: %d\n", BUILT_IN_COMPLEX_MUL_MAX); */
+        /* printf ("BUILT_IN_COMPLEX_DIV_MIN: %d\n", BUILT_IN_COMPLEX_DIV_MIN); */
+        /* printf ("BUILT_IN_COMPLEX_DIV_MAX: %d\n", BUILT_IN_COMPLEX_DIV_MAX); */
+        /* printf ("END_BUILTINS: %d\n", END_BUILTINS); */
+      }
+
+      if (DECL_POINTER_ALIAS_SET_KNOWN_P (t))
+        _gs_bv (flags, GS_DECL_POINTER_ALIAS_SET, DECL_POINTER_ALIAS_SET (t));
+
+      /* DECL_CONTEXT */
+      /* DECL_ATTRIBUTES */
+      /* DECL_ABSTRACT_ORIGIN */
+      /* DECL_RESULT_FLD */
+      /* DECL_INITIAL */
+      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_CONTEXT,
+		 gs_x_1 (DECL_CONTEXT(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ATTRIBUTES,
+		 gs_x_1 (DECL_ATTRIBUTES(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ABSTRACT_ORIGIN,
+		 gs_x_1 (DECL_ABSTRACT_ORIGIN(t), seq_num));
+
+      /* Don't care about the DECL_INITIAL In a TYPE_DECL.  (For C++, the
+       * DECL_INITIAL is used as DECL_FRIENDLIST.)  Bug 11281. */
+      if (TREE_CODE (t) != TYPE_DECL) {
+	gs_set_operand((gs_t) GS_NODE(t), GS_DECL_INITIAL,
+		       gs_x_1 (DECL_INITIAL(t), seq_num));
+      }
+
+      /* if (DECL_RTL_SET_P (t)) */
+
+      if (gs_operand((gs_t) GS_NODE(t), GS_DECL_ALIGN_UNIT) == NULL)
+      {
+	gs_t decl_align_unit;
+	decl_align_unit = __gs (IB_INT);
+	_gs_n (decl_align_unit, DECL_ALIGN_UNIT (t)); 
+	gs_set_operand ((gs_t) GS_NODE (t), GS_DECL_ALIGN_UNIT, decl_align_unit);
+      }
+
+      _gs_bv (flags, GS_DECL_ASSEMBLER_NAME_SET_P, DECL_ASSEMBLER_NAME_SET_P (t));
+      _gs_bv (flags, GS_DECL_ARTIFICIAL, DECL_ARTIFICIAL(t));
+      _gs_bv (flags, GS_DECL_LANG_SPECIFIC, DECL_LANG_SPECIFIC (t));
+
+      if (TREE_CODE (t) == FUNCTION_DECL
+         || (TREE_CODE (t) == VAR_DECL
+            && (TREE_STATIC (t)
+                || DECL_EXTERNAL (t)
+                || TREE_PUBLIC (t)
+		|| (DECL_REGISTER(t) && DECL_HARD_REGISTER(t))))) {
+        gs_set_operand((gs_t) GS_NODE(t), GS_DECL_ASSEMBLER_NAME,
+		   gs_x_1(DECL_ASSEMBLER_NAME(t), seq_num));
+      }
+
+      /* C++ */
+      {
+        gs_t cp_decl_flags;
+	if (gs_operand((gs_t) GS_NODE(t), GS_CP_DECL_FLAGS) == NULL) {
+	  cp_decl_flags = __gs (IB_BIT_VECTOR);
+	  gs_set_operand ((gs_t) GS_NODE (t), GS_CP_DECL_FLAGS, cp_decl_flags);
+	}
+	else cp_decl_flags = gs_operand((gs_t) GS_NODE(t), GS_CP_DECL_FLAGS);
+
+        if (TREE_CODE (t) == VAR_DECL)
+          _gs_bv (cp_decl_flags, GS_DECL_COMDAT, DECL_COMDAT (t));
+
+	if (TREE_CODE (t) == VAR_DECL || TREE_CODE (t) == FUNCTION_DECL)
+          gs_set_operand((gs_t) GS_NODE(t), GS_DECL_SECTION_NAME,
+                         gs_x_1(DECL_SECTION_NAME(t), seq_num));
+
+        if (TREE_PUBLIC (t))
+          _gs_bv (cp_decl_flags, GS_DECL_ONE_ONLY, DECL_ONE_ONLY (t));
+
+        if (CPR()) {	/* C++ */
+	  switch (TREE_CODE(t)) {
+	    case FUNCTION_DECL:
+	      
+	      if (!DECL_LANG_SPECIFIC (t)) {
+	        /* Following C++ snippet necessitates the need of condition 
+	         * "if (!DECL_LANG_SPECIFIC(t))"
+	         * 
+	         *   #pragma weak bar1 = foo1
+	         *   extern "C" void foo1 (void) { }
+	         *
+	         *  The front end creates a decl tree both for bar1() and foo1().
+	         *  The decl.lang_specific field of the decl tree for bar1() is NULL,
+	         *  as evidenced in maybe_apply_pending_pragma_weaks(). 
+	         *  If the <t> being procesed is the decl tree for bar1(), calling 
+	         *  macros like DECL_GLOBAL_CTOR_P will incur segamentation fault.
+	         */
+	        break;
+	      }
+
+	      _gs_bv(cp_decl_flags, GS_DECL_GLOBAL_CTOR_P,
+		     DECL_GLOBAL_CTOR_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_GLOBAL_DTOR_P,
+		     DECL_GLOBAL_DTOR_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P,
+		     DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P,
+		     DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_FUNCTION_MEMBER_P,
+		     DECL_FUNCTION_MEMBER_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_USES_TEMPLATE_PARMS,
+		     (*p_uses_template_parms)(t));
+	      _gs_bv(cp_decl_flags,
+		     GS_DECL_COPY_CONSTRUCTOR_P, /* DECL_COPY_CONSTRUCTOR_P */
+		     DECL_CONSTRUCTOR_P (t) && (*p_copy_fn_p) (t) > 0);
+	      _gs_bv(cp_decl_flags, GS_DECL_EXTERN_C_P,
+		     DECL_EXTERN_C_P(t));
+#ifdef FE_GNU_4_2_0
+	      _gs_bv(cp_decl_flags, GS_DECL_CONSTRUCTOR_P,
+		     DECL_CONSTRUCTOR_P(t));
+	      _gs_bv(cp_decl_flags, GS_DECL_ASSIGNMENT_OPERATOR_P,
+		     DECL_ASSIGNMENT_OPERATOR_P(t));
+#endif
+
+	      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_NAMED_RETURN_OBJECT,
+			   gs_x_1(DECL_NAMED_RETURN_OBJECT(t), seq_num));
+
+	      if (DECL_THUNK_P(t)) {
+		gs_t fixed = __gs(IB_LONG);
+		_gs_n(fixed, THUNK_FIXED_OFFSET(t));
+
+		gs_set_operand((gs_t) GS_NODE(t), GS_THUNK_FIXED_OFFSET, fixed);
+		gs_set_operand((gs_t) GS_NODE(t), GS_THUNK_VIRTUAL_OFFSET,
+			   gs_x_1(THUNK_VIRTUAL_OFFSET(t), seq_num));
+		gs_set_operand((gs_t) GS_NODE(t), GS_THUNK_TARGET,
+			   gs_x_1(THUNK_TARGET(t), seq_num));
+		_gs_bv(cp_decl_flags, GS_DECL_THIS_THUNK_P,
+			   DECL_THIS_THUNK_P(t));
+	      }
+
+	      break;
+
+	    case NAMESPACE_DECL:
+	      if (NAMESPACE_LEVEL(t)) {	/* bug 10855 */
+		gs_set_operand((gs_t) GS_NODE(t), GS_CP_NAMESPACE_DECLS,
+			       gs_x_1(NAMESPACE_LEVEL(t)->names, seq_num));
+	      }
+	      gs_set_operand((gs_t) GS_NODE(t), GS_DECL_NAMESPACE_ALIAS,
+			 gs_x_1(DECL_NAMESPACE_ALIAS(t), seq_num));
+	      break;
+
+	    case TEMPLATE_DECL:
+	      if (DECL_LANG_SPECIFIC (t))
+	        gs_set_operand((gs_t) GS_NODE (t), GS_MOST_GENERAL_TEMPLATE,
+			   gs_x_1((*p_most_general_template)(t), seq_num));
+	      break;
+
+	    default:
+	      break;
+	  }
+
+	  if ((TREE_CODE(t) == VAR_DECL ||
+	       TREE_CODE(t) == FUNCTION_DECL ||
+	       TREE_CODE(t) == TYPE_DECL ||
+	       TREE_CODE(t) == TEMPLATE_DECL) &&
+	      DECL_LANG_SPECIFIC(t) != NULL &&
+	      DECL_TEMPLATE_INFO(t) != NULL) {
+	    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_TEMPLATE_INFO,
+		       gs_x_1(DECL_TEMPLATE_INFO(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_DECL_TI_TEMPLATE,
+		       gs_x_1(DECL_TI_TEMPLATE(t), seq_num));
+	  }
+
+	  if (TREE_CODE(t) == VAR_DECL ||
+	      TREE_CODE(t) == FUNCTION_DECL) {
+	    _gs_bv(cp_decl_flags, GS_DECL_TEMPLATE_INSTANTIATED, 
+		   DECL_TEMPLATE_INSTANTIATED(t));
+	  }
+
+	  if (DECL_LANG_SPECIFIC(t)) {
+	    _gs_bv(cp_decl_flags, GS_DECL_IMPLICIT_INSTANTIATION,
+		   DECL_IMPLICIT_INSTANTIATION(t));
+	    _gs_bv(cp_decl_flags, GS_DECL_TEMPLATE_SPECIALIZATION,
+		   DECL_TEMPLATE_SPECIALIZATION(t));
+            _gs_bv(cp_decl_flags, GS_DECL_COMPLETE_CONSTRUCTOR_P,
+                   DECL_COMPLETE_CONSTRUCTOR_P(t));
+#ifdef FE_GNU_4_2_0
+            _gs_bv(cp_decl_flags, GS_DECL_COMPLETE_DESTRUCTOR_P,
+                   DECL_COMPLETE_DESTRUCTOR_P(t));
+            _gs_bv(cp_decl_flags, GS_DECL_HAS_IN_CHARGE_PARM_P,
+                   DECL_HAS_IN_CHARGE_PARM_P(t));
+            _gs_bv(cp_decl_flags, GS_DECL_HAS_VTT_PARM_P,
+                   DECL_HAS_VTT_PARM_P(t));
+#endif
+            _gs_bv(cp_decl_flags, GS_DECL_REALLY_EXTERN, DECL_REALLY_EXTERN(t));
+            if (! DECL_REALLY_EXTERN(t) &&
+                gs_bv(cp_decl_flags, GS_DECL_REALLY_EXTERN))
+              _gs_bv_reset (cp_decl_flags, GS_DECL_REALLY_EXTERN);
+            _gs_bv(cp_decl_flags, GS_DECL_USE_TEMPLATE, DECL_USE_TEMPLATE(t));
+            if (TREE_CODE(t) == VAR_DECL)
+              _gs_bv(cp_decl_flags, GS_CP_DECL_THREADPRIVATE_P,
+                     CP_DECL_THREADPRIVATE_P(t));
+	  }
+          gs_set_operand((gs_t) GS_NODE (t), GS_CP_DECL_CONTEXT,
+		     gs_x_1(CP_DECL_CONTEXT(t), seq_num));
+          _gs_bv(cp_decl_flags, GS_DECL_NAMESPACE_SCOPE_P,
+		 DECL_NAMESPACE_SCOPE_P(t));
+        }
+      }
+
+      /* DECL_FLAG2 */
+      gs_set_operand((gs_t) GS_NODE (t), GS_DECL_FLAG2, __gs (IB_BIT_VECTOR));
+      gs_set_decl_tls_model((gs_t) GS_NODE (t), DECL_TLS_MODEL(t));
+      GS_ASSERT(gs_decl_tls_model((gs_t) GS_NODE (t) ) == DECL_TLS_MODEL(t),
+                ("tls_model setting failure!!!"));
+      gs_set_decl_visibility_specified((gs_t) GS_NODE (t), DECL_VISIBILITY_SPECIFIED(t));
+      gs_set_decl_visibility((gs_t) GS_NODE (t), DECL_VISIBILITY(t));
+
+      break;
+
+    case tcc_type:
+
+      switch (TREE_CODE(t)) {
+	case ENUMERAL_TYPE:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_VALUES, gs_x_1(TYPE_VALUES(t),
+		     seq_num));
+	  break;
+
+	case ARRAY_TYPE:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_DOMAIN, gs_x_1(TYPE_DOMAIN(t),
+		     seq_num));
+	  if (TYPE_NONALIASED_COMPONENT(t))
+	    _gs_bv(flags, GS_TYPE_NONALIASED_COMPONENT,
+		   TYPE_NONALIASED_COMPONENT(t));
+	  break;
+
+	case VECTOR_TYPE:
+	  {
+	    gs_t parts_node;
+	    parts_node = __gs (IB_INT);
+	    _gs_n (parts_node, TYPE_VECTOR_SUBPARTS (t));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_VECTOR_SUBPARTS, parts_node);
+
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_DEBUG_REPRESENTATION_TYPE,
+		       gs_x_1(TYPE_DEBUG_REPRESENTATION_TYPE(t), seq_num));
+	  }
+	  break;
+
+	case UNION_TYPE:
+	  if (TYPE_TRANSPARENT_UNION(t))
+	    _gs_bv(flags, GS_TYPE_TRANSPARENT_UNION, TYPE_TRANSPARENT_UNION(t));
+	  /* fall through */
+
+	case RECORD_TYPE:
+	  if (TREE_CODE(t) == RECORD_TYPE) {
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_BINFO, gs_x_1(TYPE_BINFO(t),
+		       seq_num));
+	  }
+	  if (CPR()) {
+	      /* Currently, wgen uses the following flag only for these types.
+	       * It is ok not to set it for C. */
+	      _gs_bv(flags, GS_AGGREGATE_VALUE_P, aggregate_value_p (t, NULL));
+	  }
+	  /* fall through */
+
+	case QUAL_UNION_TYPE:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_FIELDS, gs_x_1(TYPE_FIELDS(t),
+		     seq_num));
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_VFIELD, gs_x_1(TYPE_VFIELD(t),
+	  	     seq_num));
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_METHODS, gs_x_1(TYPE_METHODS(t),
+		     seq_num));
+
+	  if (TYPE_NO_FORCE_BLK(t))
+	    _gs_bv(flags, GS_TYPE_NO_FORCE_BLK, TYPE_NO_FORCE_BLK(t));
+	  break;
+
+	case FUNCTION_TYPE:
+	  if (TYPE_RETURNS_STACK_DEPRESSED(t))
+	    _gs_bv(flags, GS_TYPE_RETURNS_STACK_DEPRESSED,
+		   TYPE_RETURNS_STACK_DEPRESSED(t));
+	  /* fall through */
+
+	case METHOD_TYPE:
+	  if (TYPE_METHOD_BASETYPE(t)) {
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_METHOD_BASETYPE,
+		       gs_x_1(TYPE_METHOD_BASETYPE(t), seq_num));
+	  }
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_ARG_TYPES,
+		     gs_x_1(TYPE_ARG_TYPES(t), seq_num));
+	  break;
+
+	case OFFSET_TYPE:
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_OFFSET_BASETYPE,
+		     gs_x_1(TYPE_OFFSET_BASETYPE(t), seq_num));
+	  break;
+
+	case INTEGER_TYPE:
+	  if (TYPE_IS_SIZETYPE(t))
+	    _gs_bv(flags, GS_TYPE_IS_SIZETYPE, TYPE_IS_SIZETYPE(t));
+	  break;
+
+	default:
+	  break;
+      }
+
+      _gs_bv (flags, GS_TYPE_UNSIGNED, TYPE_UNSIGNED (t));
+      _gs_bv (flags, GS_TYPE_STRING_FLAG, TYPE_STRING_FLAG (t));
+      _gs_bv (flags, GS_TYPE_NEEDS_CONSTRUCTING, TYPE_NEEDS_CONSTRUCTING (t));
+      _gs_bv (flags, GS_TYPE_PACKED, TYPE_PACKED (t));
+      _gs_bv (flags, GS_TYPE_RESTRICT, TYPE_RESTRICT (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_0, TYPE_LANG_FLAG_0 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_1, TYPE_LANG_FLAG_1 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_2, TYPE_LANG_FLAG_2 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_3, TYPE_LANG_FLAG_3 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_4, TYPE_LANG_FLAG_4 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_5, TYPE_LANG_FLAG_5 (t));
+      _gs_bv (flags, GS_TYPE_LANG_FLAG_6, TYPE_LANG_FLAG_6 (t));
+      _gs_bv (flags, GS_TYPE_VOLATILE, TYPE_VOLATILE (t));
+
+      if (TYPE_NAME(t)) {
+	if (TREE_CODE(TYPE_NAME(t)) == IDENTIFIER_NODE)
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_NAME, gs_x_1(TYPE_NAME(t),
+		     seq_num));
+	else if (TREE_CODE(TYPE_NAME(t)) == TYPE_DECL)
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_NAME, gs_x_1(TYPE_NAME(t),
+		     seq_num));
+      }
+
+      /* mode */
+      mode = TYPE_MODE (t);
+      if (gs_operand((gs_t) GS_NODE(t), GS_TYPE_MODE) == NULL)
+      {
+        gs_t mode_node;
+        mode_node = __gs (IB_STRING);
+        _gs_s (mode_node, (gs_string_t) GET_MODE_NAME (mode),
+	       1 + strlen (GET_MODE_NAME (mode)));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_TYPE_MODE, mode_node);
+      }
+
+      /* TYPE_SIZE */
+      /* TYPE_SIZE_UNIT */
+      /* TYPE_USER_ALIGN */
+      /* printf ("TYPE_SIZE: %p\n", TYPE_SIZE (t)); */
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_SIZE,
+		 gs_x_1(TYPE_SIZE(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_SIZE_UNIT,
+		 gs_x_1(TYPE_SIZE_UNIT(t), seq_num));
+      /* TODO: Freeup this slot. */
+      /* gs_set_operand ((gs_t) GS_NODE (t), GS_TYPE_USER_ALIGN, gs_x (TYPE_USER_ALIGN (t))); */
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_USER_ALIGN, gs_x_1(NULL, seq_num));
+
+      /* align */
+      if (gs_operand((gs_t) GS_NODE(t), GS_TYPE_ALIGN) == NULL) {
+        gs_t align_node;
+        align_node = __gs (IB_INT);
+        _gs_n (align_node, TYPE_ALIGN (t));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_TYPE_ALIGN, align_node);
+      }
+
+      /* alias_set_node */
+      if (gs_operand((gs_t) GS_NODE (t), GS_TYPE_ALIAS_SET) == NULL) {
+	gs_t alias_set_node;
+	alias_set_node = __gs (IB_INT);
+	_gs_n (alias_set_node, TYPE_ALIAS_SET (t));
+	gs_set_operand ((gs_t) GS_NODE (t), GS_TYPE_ALIAS_SET, alias_set_node);
+      }
+
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_ATTRIBUTES,
+		 gs_x_1(TYPE_ATTRIBUTES(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_CONTEXT, gs_x_1(TYPE_CONTEXT(t),
+		 seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_POINTER_TO,
+		 gs_x_1(TYPE_POINTER_TO(t), seq_num));
+      gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_REFERENCE_TO,
+		 gs_x_1(TYPE_REFERENCE_TO(t), seq_num));
+
+      _gs_bv (flags, GS_TYPE_LANG_SPECIFIC, TYPE_LANG_SPECIFIC(t));
+      _gs_bv (flags, GS_POINTER_TYPE_P, POINTER_TYPE_P(t));
+
+      /* TYPE_PRECISION, TYPE_MIN_VALUE, TYPE_MAX_VALUE */
+      {
+	if (gs_operand((gs_t) GS_NODE(t), GS_TYPE_PRECISION) == NULL) {
+	  gs_t type_precision;
+	  type_precision = __gs (IB_INT);
+	  _gs_n (type_precision, TYPE_PRECISION (t));
+	  gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_PRECISION, type_precision);
+	}
+	gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_MIN_VALUE,
+		   gs_x_1(TYPE_MIN_VALUE (t), seq_num));
+	gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_MAX_VALUE,
+		   gs_x_1(TYPE_MAX_VALUE(t), seq_num));
+      }
+
+      /* C++ */
+      {
+        gs_t cp_type_flags;
+	if (gs_operand((gs_t) GS_NODE(t), GS_CP_TYPE_FLAGS) == NULL) {
+	  cp_type_flags = __gs (IB_BIT_VECTOR);
+	  gs_set_operand ((gs_t) GS_NODE (t), GS_CP_TYPE_FLAGS, cp_type_flags);
+	}
+	else cp_type_flags = gs_operand((gs_t) GS_NODE (t), GS_CP_TYPE_FLAGS);
+
+        if (CPR ()) {
+          _gs_bv (cp_type_flags, GS_TYPE_PTRMEMFUNC_P, TYPE_PTRMEMFUNC_P(t));
+          _gs_bv (cp_type_flags, GS_TYPE_PTRMEM_P, TYPE_PTRMEM_P(t));
+          _gs_bv (cp_type_flags, GS_ANON_UNION_TYPE_P, ANON_UNION_TYPE_P(t));
+          _gs_bv (cp_type_flags, GS_CLASS_TYPE_P, CLASS_TYPE_P(t));
+          if (TYPE_LANG_SPECIFIC (t) &&
+	      TYPE_LANG_SPECIFIC(t)->u.h.is_lang_type_class) {
+	    gs_set_operand((gs_t) GS_NODE(t), GS_CLASSTYPE_AS_BASE,
+		       gs_x_1(CLASSTYPE_AS_BASE(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_CLASSTYPE_TYPEINFO_VAR,
+		       gs_x_1(CLASSTYPE_TYPEINFO_VAR(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_CLASSTYPE_COPY_CONSTRUCTOR,
+		       gs_x_1(CLASSTYPE_COPY_CONSTRUCTOR(t), seq_num));
+
+	    _gs_bv(cp_type_flags, GS_CLASSTYPE_INTERFACE_ONLY,
+		   CLASSTYPE_INTERFACE_ONLY(t));
+	    _gs_bv(cp_type_flags, GS_CLASSTYPE_TEMPLATE_SPECIALIZATION,
+		   CLASSTYPE_TEMPLATE_SPECIALIZATION(t));
+#ifdef FE_GNU_4_2_0
+	    _gs_bv(cp_type_flags, GS_CLASSTYPE_NON_POD_P,
+		   CLASSTYPE_NON_POD_P(t));
+	    _gs_bv(cp_type_flags, GS_TYPE_HAS_DEFAULT_CONSTRUCTOR,
+		   TYPE_HAS_DEFAULT_CONSTRUCTOR(t));
+	    _gs_bv(cp_type_flags, GS_TYPE_HAS_IMPLICIT_COPY_CONSTRUCTOR,
+	           TYPE_HAS_IMPLICIT_COPY_CONSTRUCTOR(t));
+#endif
+	  }
+
+	  switch (TREE_CODE(t)) {
+	    case RECORD_TYPE:
+	      _gs_bv(cp_type_flags, GS_TYPE_USES_TEMPLATE_PARMS,
+		     (*p_uses_template_parms)(t));
+	      /* fall through */
+
+	    case UNION_TYPE:
+	      _gs_bv(cp_type_flags, GS_IS_EMPTY_CLASS, (*p_is_empty_class)(t));
+	      break;
+
+	    default:
+	      break;
+	  }
+        }
+      }
+
+      if (TYPE_MAIN_VARIANT (t) != t)
+        gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_MAIN_VARIANT,
+		   gs_x_1(TYPE_MAIN_VARIANT(t), seq_num));
+      else
+        gs_set_operand((gs_t) GS_NODE(t), GS_TYPE_MAIN_VARIANT, (gs_t) GS_NODE(t));
+      break;
+
+    case tcc_expression:
+    case tcc_comparison:
+    case tcc_unary:
+    case tcc_binary:
+    case tcc_reference:
+    case tcc_statement:
+
+      {
+        gs_t length;
+
+	switch (TREE_CODE(t)) {
+	  case BIT_FIELD_REF:
+	    _gs_bv(flags, GS_BIT_FIELD_REF_UNSIGNED, BIT_FIELD_REF_UNSIGNED(t));
+	    break;
+	  case TARGET_EXPR:
+	    _gs_bv(flags, GS_EMIT_TARGET_EXPR_CLEANUP,
+		   EMIT_TARGET_EXPR_CLEANUP(t));
+	    break;
+	  case CALL_EXPR:
+	    {
+	      /* bug 12598: Try to fold OBJ_TYPE_REF if it is present
+	         under the CALL_EXPR. Code adapted from fold_stmt() . */
+	      tree callee = get_callee_fndecl (t);
+              if (callee && TREE_CODE(callee) == FUNCTION_DECL)
+              {
+                 /* we need to emit the function be calleed, no matter 
+                    if the call is removed later by gcc cfg cleanup, so 
+                    the open64 backend wouldn't be surprised by missing
+                    function definition. */
+                 TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (callee)) = 1;
+              }
+	      if (!(callee && DECL_BUILT_IN(callee)))
+	      {
+		callee = TREE_OPERAND(t,0);
+		if (TREE_CODE(callee) == OBJ_TYPE_REF &&
+		    lang_hooks.fold_obj_type_ref
+		    && TREE_CODE (OBJ_TYPE_REF_OBJECT (callee)) == ADDR_EXPR
+		    && DECL_P (TREE_OPERAND(OBJ_TYPE_REF_OBJECT (callee), 0)))
+		    {
+		      tree t1 = TREE_TYPE (TREE_TYPE
+		                           (OBJ_TYPE_REF_OBJECT (callee)));
+		      t1 = lang_hooks.fold_obj_type_ref (callee, t1);
+		      if (t1)
+		        TREE_OPERAND (t, 0) = t1;
+		    }
+	      }
+	    }
+	    break;
+	  case OMP_ATOMIC:
+	    {
+	      /* For the atomic operation
+
+	          lhs = expr
+
+	         where 'expr' may use the variable 'lhs', the first operand
+	         of OMP_ATOMIC is &lhs, and the second operand is 'expr'. GCC
+	         knows to always refer the first operand through an 
+	         indirect_ref. So we build it here for wgen, but don't modify
+	         the GNU tree.
+
+	         The operands are already set here, so we should not redo it
+	         below.
+	      */
+	      gs_set_operand((gs_t) GS_NODE(t), GS_TREE_OPERAND_ZERO,
+	        gs_x_1(build_indirect_ref(TREE_OPERAND(t, 0), NULL), seq_num));
+	      gs_set_operand((gs_t) GS_NODE(t), GS_TREE_OPERAND_ZERO + 1,
+	        gs_x_1(TREE_OPERAND(t, 1), seq_num));
+	    }
+	    break;
+
+	  default:
+	    break;
+	}
+
+        /* length = TREE_CODE_LENGTH (TREE_CODE ()) */
+        length = __gs (IB_INT);
+        _gs_n (length, TREE_CODE_LENGTH (TREE_CODE (t)));
+        gs_set_operand ((gs_t) GS_NODE (t), GS_ARITY, length);
+
+        {
+          gs_t file, line;
+  
+          if (EXPR_HAS_LOCATION (t)) {
+            file = __gs (IB_STRING);
+            _gs_s (file, (gs_string_t) EXPR_FILENAME (t),
+		   1 + strlen (EXPR_FILENAME (t)));
+            line = __gs (IB_INT);
+            _gs_n (line, EXPR_LINENO (t));
+ 
+	    gs_set_operand ((gs_t) GS_NODE (t), GS_EXPR_FILENAME, file);
+	    gs_set_operand ((gs_t) GS_NODE (t), GS_EXPR_LINENO, line);
+          }
+
+          _gs_bv (flags, GS_EXPR_HAS_LOCATION, EXPR_HAS_LOCATION (t));
+        }
+
+	/* ATOMIC has already been processed above. */
+	if (TREE_CODE(t) != OMP_ATOMIC)
+          /* max value returnable by TREE_CODE_LENGTH () seems to be 4. */
+          for (i = 0; i < TREE_CODE_LENGTH (TREE_CODE (t)); i++) {
+            gs_set_operand((gs_t) GS_NODE(t), GS_TREE_OPERAND_ZERO + i,
+		       gs_x_1(TREE_OPERAND(t, i), seq_num));
+	  }
+
+        /* C++ */
+        {
+          gs_t cp_expr_flags;
+          cp_expr_flags = __gs (IB_BIT_VECTOR);
+          gs_set_operand ((gs_t) GS_NODE (t), GS_CP_EXPR_FLAGS, cp_expr_flags);
+
+          if (TREE_CODE (t) == CLEANUP_STMT && CPR ()) /* Will be NULL if this is a C run. */
+            gs_set_operand((gs_t) GS_NODE(t), GS_CLEANUP_EXPR,
+		       gs_x_1(CLEANUP_EXPR(t), seq_num));
+
+          if (CPR())
+          {
+            /* We can have this kid for classes also, but that is not
+             * currently required. */
+            if (TREE_CODE(t) == HANDLER)
+            {
+              tree htype = HANDLER_TYPE (t);
+              /* Note: NULL htype for catch-all clause */
+              if (htype && !CLASS_TYPE_P (htype))
+              {
+                /* Make sure htype has been translated. */
+                gs_x_1(htype, seq_num);
+                gs_set_operand ((gs_t) GS_NODE (htype),
+                            GS_TYPEINFO_DECL,
+                            gs_x_1((*p_get_tinfo_decl)(htype), seq_num));
+              }
+            }
+            else if (TREE_CODE(t) == EH_SPEC_BLOCK)
+            {
+              tree spec = EH_SPEC_RAISES (t);
+              for (; spec; spec = TREE_CHAIN (spec))
+              {
+                tree htype = TREE_VALUE (spec);
+                if (htype && !CLASS_TYPE_P (htype))
+                {
+                  /* Make sure htype has been translated. */
+                  gs_x_1(htype, seq_num);
+                  gs_set_operand ((gs_t) GS_NODE (htype),
+                              GS_TYPEINFO_DECL,
+                              gs_x_1((*p_get_tinfo_decl)(htype), seq_num));
+                }
+              }
+            }
+          }
+
+          _gs_bv(cp_expr_flags, GS_STMT_IS_FULL_EXPR_P, STMT_IS_FULL_EXPR_P(t));
+
+	  switch (TREE_CODE(t)) {
+	    case AGGR_INIT_EXPR:
+	      _gs_bv(cp_expr_flags, GS_AGGR_INIT_VIA_CTOR_P,
+		     AGGR_INIT_VIA_CTOR_P(t));
+	      break;
+	    case TARGET_EXPR:
+	    case WITH_CLEANUP_EXPR:
+	    case CLEANUP_STMT:
+	      _gs_bv(cp_expr_flags, GS_CLEANUP_EH_ONLY, CLEANUP_EH_ONLY(t));
+	      break;
+	    default:
+	      break;
+	  }
+        }
+      }
+      break;
+
+    case tcc_constant:
+    case tcc_exceptional:
+
+      switch (TREE_CODE (t)) {
+
+	  case INTEGER_CST:
+            {
+              /* low, high */
+              gs_t low, high; 
+
+              _gs_bv (flags, GS_TREE_CONSTANT_OVERFLOW, TREE_CONSTANT_OVERFLOW (t));
+  
+              /* printf ("TREE_INT_CST_HIGH (t): %lld, TREE_INT_CST_LOW (t): %llu\n", TREE_INT_CST_HIGH (t), TREE_INT_CST_LOW (t)); */
+
+              low  = __gs (IB_UNSIGNED_LONG_LONG); 
+              high = __gs (IB_LONG_LONG);
+
+              _gs_ull (low, TREE_INT_CST_LOW (t));
+              _gs_ll (high, TREE_INT_CST_HIGH (t));
+
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_INT_CST_LOW, low);
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_INT_CST_HIGH, high);
+
+              /* printf ("tree_int_cst_high (t): %lld, tree_int_cst_low (t): %llu\n", gs_ll (high), gs_ull (low)); */
+            }
+  	    break;
+  
+          case PTRMEM_CST:
+	    {
+	      /* The usual way to expand PTRMEM_CST is to call
+	       * cplus_expand_constant, so do it now while we have access to
+	       * cplus_expand_constant. */
+	      tree t2;
+	      GS_ASSERT(lang_hooks.cplus_expand_constant,
+			("gs_x_1: lang hook NULL for cplus_expand_constant"));
+	      t2 = lang_hooks.cplus_expand_constant(t);
+	      gs_set_operand((gs_t) GS_NODE(t), GS_EXPANDED_PTRMEM_CST,
+			 gs_x_1(t2, seq_num));
+	    }
+  	    break;
+
+          case REAL_CST:
+            {
+  	      REAL_VALUE_TYPE d;
+  	      char string[16*8];
+              gs_t value_f;
+              gs_t value_d;
+              gs_t value_ld;
+    
+              _gs_bv (flags, GS_TREE_OVERFLOW, TREE_OVERFLOW (t));
+    
+              value_f =  __gs (IB_FLOAT);
+              value_d =  __gs (IB_DOUBLE);
+              value_ld = __gs (IB_LONG_DOUBLE);
+
+  	      d = TREE_REAL_CST (t);
+              _gs_bv (flags, GS_REAL_VALUE_ISINF, REAL_VALUE_ISINF (d));
+              _gs_bv (flags, GS_REAL_VALUE_ISNAN, REAL_VALUE_ISNAN (d));
+	      real_to_decimal (string, &d, sizeof (string), 0, 1);
+
+              _gs_f (value_f, strtof ((string), NULL));
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_REAL_CST_F, value_f);
+              _gs_d (value_d, strtod ((string), NULL));
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_REAL_CST_D, value_d);
+              _gs_ld (value_ld, strtold ((string), NULL));
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_REAL_CST_LD, value_ld);
+            }
+	    break;
+
+	  case VECTOR_CST:
+	    {
+              /* Does this work? */
+              /* TREE_VECTOR_CST_ELTS */
+	      gs_set_operand((gs_t) GS_NODE(t), GS_TREE_VECTOR_CST_ELTS,
+			 gs_x_1(TREE_VECTOR_CST_ELTS(t), seq_num));
+	    }
+	    break;
+
+	  case COMPLEX_CST:
+            /* TREE_REALPART */
+            /* TREE_IMAGPART */
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TREE_REALPART,
+		       gs_x_1(TREE_REALPART(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TREE_IMAGPART,
+		       gs_x_1(TREE_IMAGPART(t), seq_num));
+	    break;
+
+	  case STRING_CST:
+            /* string_constant */
+	    {
+              gs_t string_pointer, string_length;
+
+              string_pointer = __gs (IB_STRING);
+              /* bug 11180: TREE_STRING_LENGTH does not include '\0'. */
+              _gs_s (string_pointer, (gs_string_t) TREE_STRING_POINTER (t),
+		     1 + TREE_STRING_LENGTH (t));
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_STRING_POINTER, string_pointer);
+
+              string_length = __gs (IB_INT);
+              _gs_n (string_length, TREE_STRING_LENGTH (t));
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_STRING_LENGTH, string_length);
+            }
+	    break;
+
+	  case IDENTIFIER_NODE:
+
+          /* gs_tree_symbol_referenced uses the GS_TREE_STATIC flag */
+          _gs_bv (flags, GS_TREE_STATIC, TREE_SYMBOL_REFERENCED(t));
+
+#define BUILTIN_PREFIXED(builtin)                           \
+     (strcmp (builtin, 10 + IDENTIFIER_POINTER (t)) == 0) { \
+    _gs_s (name, (gs_string_t) builtin, sizeof (builtin));                \
+    goto ATTACH_ID_PTR;                                     \
+  }
+
+            /* name */
+            {
+               gs_t name;
+               name = __gs (IB_STRING);
+               if (strncmp ("__builtin_", IDENTIFIER_POINTER (t), 10) == 0) {
+
+                      if BUILTIN_PREFIXED ("acos")
+                 else if BUILTIN_PREFIXED ("acosf")
+                 else if BUILTIN_PREFIXED ("acosh")
+                 else if BUILTIN_PREFIXED ("acoshf")
+                 else if BUILTIN_PREFIXED ("acoshl")
+                 else if BUILTIN_PREFIXED ("acosl")
+                 else if BUILTIN_PREFIXED ("asin")
+                 else if BUILTIN_PREFIXED ("asinf")
+                 else if BUILTIN_PREFIXED ("asinh")
+                 else if BUILTIN_PREFIXED ("asinhf")
+                 else if BUILTIN_PREFIXED ("asinhl")
+                 else if BUILTIN_PREFIXED ("asinl")
+                 else if BUILTIN_PREFIXED ("atan")
+                 else if BUILTIN_PREFIXED ("atan2")
+                 else if BUILTIN_PREFIXED ("atan2f")
+                 else if BUILTIN_PREFIXED ("atan2l")
+                 else if BUILTIN_PREFIXED ("atanf")
+                 else if BUILTIN_PREFIXED ("atanh")
+                 else if BUILTIN_PREFIXED ("atanhf")
+                 else if BUILTIN_PREFIXED ("atanhl")
+                 else if BUILTIN_PREFIXED ("atanl")
+                 else if BUILTIN_PREFIXED ("cbrt")
+                 else if BUILTIN_PREFIXED ("cbrtf")
+                 else if BUILTIN_PREFIXED ("cbrtl")
+                 else if BUILTIN_PREFIXED ("ceil")
+                 else if BUILTIN_PREFIXED ("ceilf")
+                 else if BUILTIN_PREFIXED ("ceill")
+                 else if BUILTIN_PREFIXED ("copysign")
+                 else if BUILTIN_PREFIXED ("copysignf")
+                 else if BUILTIN_PREFIXED ("copysignl")
+                 else if BUILTIN_PREFIXED ("cos")
+                 else if BUILTIN_PREFIXED ("cosf")
+                 else if BUILTIN_PREFIXED ("cosh")
+                 else if BUILTIN_PREFIXED ("coshf")
+                 else if BUILTIN_PREFIXED ("coshl")
+                 else if BUILTIN_PREFIXED ("cosl")
+                 else if BUILTIN_PREFIXED ("drem")
+                 else if BUILTIN_PREFIXED ("dremf")
+                 else if BUILTIN_PREFIXED ("dreml")
+                 else if BUILTIN_PREFIXED ("erf")
+                 else if BUILTIN_PREFIXED ("erfc")
+                 else if BUILTIN_PREFIXED ("erfcf")
+                 else if BUILTIN_PREFIXED ("erfcl")
+                 else if BUILTIN_PREFIXED ("erff")
+                 else if BUILTIN_PREFIXED ("erfl")
+                 else if BUILTIN_PREFIXED ("exp")
+                 else if BUILTIN_PREFIXED ("exp10")
+                 else if BUILTIN_PREFIXED ("exp10f")
+                 else if BUILTIN_PREFIXED ("exp10l")
+                 else if BUILTIN_PREFIXED ("exp2")
+                 else if BUILTIN_PREFIXED ("exp2f")
+                 else if BUILTIN_PREFIXED ("exp2l")
+                 else if BUILTIN_PREFIXED ("expf")
+                 else if BUILTIN_PREFIXED ("expl")
+                 else if BUILTIN_PREFIXED ("expm1")
+                 else if BUILTIN_PREFIXED ("expm1f")
+                 else if BUILTIN_PREFIXED ("expm1l")
+                 else if BUILTIN_PREFIXED ("fabs")
+                 else if BUILTIN_PREFIXED ("fabsf")
+                 else if BUILTIN_PREFIXED ("fabsl")
+                 else if BUILTIN_PREFIXED ("fdim")
+                 else if BUILTIN_PREFIXED ("fdimf")
+                 else if BUILTIN_PREFIXED ("fdiml")
+                 else if BUILTIN_PREFIXED ("floor")
+                 else if BUILTIN_PREFIXED ("floorf")
+                 else if BUILTIN_PREFIXED ("floorl")
+                 else if BUILTIN_PREFIXED ("fma")
+                 else if BUILTIN_PREFIXED ("fmaf")
+                 else if BUILTIN_PREFIXED ("fmal")
+                 else if BUILTIN_PREFIXED ("fmax")
+                 else if BUILTIN_PREFIXED ("fmaxf")
+                 else if BUILTIN_PREFIXED ("fmaxl")
+                 else if BUILTIN_PREFIXED ("fmin")
+                 else if BUILTIN_PREFIXED ("fminf")
+                 else if BUILTIN_PREFIXED ("fminl")
+                 else if BUILTIN_PREFIXED ("fmod")
+                 else if BUILTIN_PREFIXED ("fmodf")
+                 else if BUILTIN_PREFIXED ("fmodl")
+                 else if BUILTIN_PREFIXED ("frexp")
+                 else if BUILTIN_PREFIXED ("frexpf")
+                 else if BUILTIN_PREFIXED ("frexpl")
+                 else if BUILTIN_PREFIXED ("gamma")
+                 else if BUILTIN_PREFIXED ("gammaf")
+                 else if BUILTIN_PREFIXED ("gammal")
+                 else if BUILTIN_PREFIXED ("huge_val")
+                 else if BUILTIN_PREFIXED ("huge_valf")
+                 else if BUILTIN_PREFIXED ("huge_vall")
+                 else if BUILTIN_PREFIXED ("hypot")
+                 else if BUILTIN_PREFIXED ("hypotf")
+                 else if BUILTIN_PREFIXED ("hypotl")
+                 else if BUILTIN_PREFIXED ("ilogb")
+                 else if BUILTIN_PREFIXED ("ilogbf")
+                 else if BUILTIN_PREFIXED ("ilogbl")
+                 else if BUILTIN_PREFIXED ("inf")
+                 else if BUILTIN_PREFIXED ("inff")
+                 else if BUILTIN_PREFIXED ("infl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("infd32")
+                 else if BUILTIN_PREFIXED ("infd64")
+                 else if BUILTIN_PREFIXED ("infd128")
+#endif
+                 else if BUILTIN_PREFIXED ("j0")
+                 else if BUILTIN_PREFIXED ("j0f")
+                 else if BUILTIN_PREFIXED ("j0l")
+                 else if BUILTIN_PREFIXED ("j1")
+                 else if BUILTIN_PREFIXED ("j1f")
+                 else if BUILTIN_PREFIXED ("j1l")
+                 else if BUILTIN_PREFIXED ("jn")
+                 else if BUILTIN_PREFIXED ("jnf")
+                 else if BUILTIN_PREFIXED ("jnl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("lceil")
+                 else if BUILTIN_PREFIXED ("lceilf")
+                 else if BUILTIN_PREFIXED ("lceill")
+#endif
+                 else if BUILTIN_PREFIXED ("ldexp")
+                 else if BUILTIN_PREFIXED ("ldexpf")
+                 else if BUILTIN_PREFIXED ("ldexpl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("lfloor")
+                 else if BUILTIN_PREFIXED ("lfloorf")
+                 else if BUILTIN_PREFIXED ("lfloorl")
+#endif
+                 else if BUILTIN_PREFIXED ("lgamma")
+                 else if BUILTIN_PREFIXED ("lgammaf")
+                 else if BUILTIN_PREFIXED ("lgammal")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("llceil")
+                 else if BUILTIN_PREFIXED ("llceilf")
+                 else if BUILTIN_PREFIXED ("llceill")
+                 else if BUILTIN_PREFIXED ("llfloor")
+                 else if BUILTIN_PREFIXED ("llfloorf")
+                 else if BUILTIN_PREFIXED ("llfloorl")
+#endif
+                 else if BUILTIN_PREFIXED ("llrint")
+                 else if BUILTIN_PREFIXED ("llrintf")
+                 else if BUILTIN_PREFIXED ("llrintl")
+                 else if BUILTIN_PREFIXED ("llround")
+                 else if BUILTIN_PREFIXED ("llroundf")
+                 else if BUILTIN_PREFIXED ("llroundl")
+                 else if BUILTIN_PREFIXED ("log")
+                 else if BUILTIN_PREFIXED ("log10")
+                 else if BUILTIN_PREFIXED ("log10f")
+                 else if BUILTIN_PREFIXED ("log10l")
+                 else if BUILTIN_PREFIXED ("log1p")
+                 else if BUILTIN_PREFIXED ("log1pf")
+                 else if BUILTIN_PREFIXED ("log1pl")
+                 else if BUILTIN_PREFIXED ("log2")
+                 else if BUILTIN_PREFIXED ("log2f")
+                 else if BUILTIN_PREFIXED ("log2l")
+                 else if BUILTIN_PREFIXED ("logb")
+                 else if BUILTIN_PREFIXED ("logbf")
+                 else if BUILTIN_PREFIXED ("logbl")
+                 else if BUILTIN_PREFIXED ("logf")
+                 else if BUILTIN_PREFIXED ("logl")
+                 else if BUILTIN_PREFIXED ("lrint")
+                 else if BUILTIN_PREFIXED ("lrintf")
+                 else if BUILTIN_PREFIXED ("lrintl")
+                 else if BUILTIN_PREFIXED ("lround")
+                 else if BUILTIN_PREFIXED ("lroundf")
+                 else if BUILTIN_PREFIXED ("lroundl")
+                 else if BUILTIN_PREFIXED ("modf")
+                 else if BUILTIN_PREFIXED ("modff")
+                 else if BUILTIN_PREFIXED ("modfl")
+                 else if BUILTIN_PREFIXED ("nan")
+                 else if BUILTIN_PREFIXED ("nanf")
+                 else if BUILTIN_PREFIXED ("nanl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("nand32")
+                 else if BUILTIN_PREFIXED ("nand64")
+                 else if BUILTIN_PREFIXED ("nand128")
+#endif
+                 else if BUILTIN_PREFIXED ("nans")
+                 else if BUILTIN_PREFIXED ("nansf")
+                 else if BUILTIN_PREFIXED ("nansl")
+                 else if BUILTIN_PREFIXED ("nearbyint")
+                 else if BUILTIN_PREFIXED ("nearbyintf")
+                 else if BUILTIN_PREFIXED ("nearbyintl")
+                 else if BUILTIN_PREFIXED ("nextafter")
+                 else if BUILTIN_PREFIXED ("nextafterf")
+                 else if BUILTIN_PREFIXED ("nextafterl")
+                 else if BUILTIN_PREFIXED ("nexttoward")
+                 else if BUILTIN_PREFIXED ("nexttowardf")
+                 else if BUILTIN_PREFIXED ("nexttowardl")
+                 else if BUILTIN_PREFIXED ("pow")
+                 else if BUILTIN_PREFIXED ("pow10")
+                 else if BUILTIN_PREFIXED ("pow10f")
+                 else if BUILTIN_PREFIXED ("pow10l")
+                 else if BUILTIN_PREFIXED ("powf")
+                 else if BUILTIN_PREFIXED ("powi")
+                 else if BUILTIN_PREFIXED ("powif")
+                 else if BUILTIN_PREFIXED ("powil")
+                 else if BUILTIN_PREFIXED ("powl")
+                 else if BUILTIN_PREFIXED ("remainder")
+                 else if BUILTIN_PREFIXED ("remainderf")
+                 else if BUILTIN_PREFIXED ("remainderl")
+                 else if BUILTIN_PREFIXED ("remquo")
+                 else if BUILTIN_PREFIXED ("remquof")
+                 else if BUILTIN_PREFIXED ("remquol")
+                 else if BUILTIN_PREFIXED ("rint")
+                 else if BUILTIN_PREFIXED ("rintf")
+                 else if BUILTIN_PREFIXED ("rintl")
+                 else if BUILTIN_PREFIXED ("round")
+                 else if BUILTIN_PREFIXED ("roundf")
+                 else if BUILTIN_PREFIXED ("roundl")
+                 else if BUILTIN_PREFIXED ("scalb")
+                 else if BUILTIN_PREFIXED ("scalbf")
+                 else if BUILTIN_PREFIXED ("scalbl")
+                 else if BUILTIN_PREFIXED ("scalbln")
+                 else if BUILTIN_PREFIXED ("scalblnf")
+                 else if BUILTIN_PREFIXED ("scalblnl")
+                 else if BUILTIN_PREFIXED ("scalbn")
+                 else if BUILTIN_PREFIXED ("scalbnf")
+                 else if BUILTIN_PREFIXED ("scalbnl")
+                 else if BUILTIN_PREFIXED ("signbit")
+                 else if BUILTIN_PREFIXED ("signbitf")
+                 else if BUILTIN_PREFIXED ("signbitl")
+                 else if BUILTIN_PREFIXED ("significand")
+                 else if BUILTIN_PREFIXED ("significandf")
+                 else if BUILTIN_PREFIXED ("significandl")
+                 else if BUILTIN_PREFIXED ("sin")
+                 else if BUILTIN_PREFIXED ("sincos")
+                 else if BUILTIN_PREFIXED ("sincosf")
+                 else if BUILTIN_PREFIXED ("sincosl")
+                 else if BUILTIN_PREFIXED ("sinf")
+                 else if BUILTIN_PREFIXED ("sinh")
+                 else if BUILTIN_PREFIXED ("sinhf")
+                 else if BUILTIN_PREFIXED ("sinhl")
+                 else if BUILTIN_PREFIXED ("sinl")
+                 else if BUILTIN_PREFIXED ("sqrt")
+                 else if BUILTIN_PREFIXED ("sqrtf")
+                 else if BUILTIN_PREFIXED ("sqrtl")
+                 else if BUILTIN_PREFIXED ("tan")
+                 else if BUILTIN_PREFIXED ("tanf")
+                 else if BUILTIN_PREFIXED ("tanh")
+                 else if BUILTIN_PREFIXED ("tanhf")
+                 else if BUILTIN_PREFIXED ("tanhl")
+                 else if BUILTIN_PREFIXED ("tanl")
+                 else if BUILTIN_PREFIXED ("tgamma")
+                 else if BUILTIN_PREFIXED ("tgammaf")
+                 else if BUILTIN_PREFIXED ("tgammal")
+                 else if BUILTIN_PREFIXED ("trunc")
+                 else if BUILTIN_PREFIXED ("truncf")
+                 else if BUILTIN_PREFIXED ("truncl")
+                 else if BUILTIN_PREFIXED ("y0")
+                 else if BUILTIN_PREFIXED ("y0f")
+                 else if BUILTIN_PREFIXED ("y0l")
+                 else if BUILTIN_PREFIXED ("y1")
+                 else if BUILTIN_PREFIXED ("y1f")
+                 else if BUILTIN_PREFIXED ("y1l")
+                 else if BUILTIN_PREFIXED ("yn")
+                 else if BUILTIN_PREFIXED ("ynf")
+                 else if BUILTIN_PREFIXED ("ynl")
+                 else if BUILTIN_PREFIXED ("cabs")
+                 else if BUILTIN_PREFIXED ("cabsf")
+                 else if BUILTIN_PREFIXED ("cabsl")
+                 else if BUILTIN_PREFIXED ("cacos")
+                 else if BUILTIN_PREFIXED ("cacosf")
+                 else if BUILTIN_PREFIXED ("cacosh")
+                 else if BUILTIN_PREFIXED ("cacoshf")
+                 else if BUILTIN_PREFIXED ("cacoshl")
+                 else if BUILTIN_PREFIXED ("cacosl")
+                 else if BUILTIN_PREFIXED ("carg")
+                 else if BUILTIN_PREFIXED ("cargf")
+                 else if BUILTIN_PREFIXED ("cargl")
+                 else if BUILTIN_PREFIXED ("casin")
+                 else if BUILTIN_PREFIXED ("casinf")
+                 else if BUILTIN_PREFIXED ("casinh")
+                 else if BUILTIN_PREFIXED ("casinhf")
+                 else if BUILTIN_PREFIXED ("casinhl")
+                 else if BUILTIN_PREFIXED ("casinl")
+                 else if BUILTIN_PREFIXED ("catan")
+                 else if BUILTIN_PREFIXED ("catanf")
+                 else if BUILTIN_PREFIXED ("catanh")
+                 else if BUILTIN_PREFIXED ("catanhf")
+                 else if BUILTIN_PREFIXED ("catanhl")
+                 else if BUILTIN_PREFIXED ("catanl")
+                 else if BUILTIN_PREFIXED ("ccos")
+                 else if BUILTIN_PREFIXED ("ccosf")
+                 else if BUILTIN_PREFIXED ("ccosh")
+                 else if BUILTIN_PREFIXED ("ccoshf")
+                 else if BUILTIN_PREFIXED ("ccoshl")
+                 else if BUILTIN_PREFIXED ("ccosl")
+                 else if BUILTIN_PREFIXED ("cexp")
+                 else if BUILTIN_PREFIXED ("cexpf")
+                 else if BUILTIN_PREFIXED ("cexpl")
+                 else if BUILTIN_PREFIXED ("cimag")
+                 else if BUILTIN_PREFIXED ("cimagf")
+                 else if BUILTIN_PREFIXED ("cimagl")
+                 else if BUILTIN_PREFIXED ("clog")
+                 else if BUILTIN_PREFIXED ("clogf")
+                 else if BUILTIN_PREFIXED ("clogl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("clog10")
+                 else if BUILTIN_PREFIXED ("clog10f")
+                 else if BUILTIN_PREFIXED ("clog10l")
+#endif
+                 else if BUILTIN_PREFIXED ("conj")
+                 else if BUILTIN_PREFIXED ("conjf")
+                 else if BUILTIN_PREFIXED ("conjl")
+                 else if BUILTIN_PREFIXED ("cpow")
+                 else if BUILTIN_PREFIXED ("cpowf")
+                 else if BUILTIN_PREFIXED ("cpowl")
+                 else if BUILTIN_PREFIXED ("cproj")
+                 else if BUILTIN_PREFIXED ("cprojf")
+                 else if BUILTIN_PREFIXED ("cprojl")
+                 else if BUILTIN_PREFIXED ("creal")
+                 else if BUILTIN_PREFIXED ("crealf")
+                 else if BUILTIN_PREFIXED ("creall")
+                 else if BUILTIN_PREFIXED ("csin")
+                 else if BUILTIN_PREFIXED ("csinf")
+                 else if BUILTIN_PREFIXED ("csinh")
+                 else if BUILTIN_PREFIXED ("csinhf")
+                 else if BUILTIN_PREFIXED ("csinhl")
+                 else if BUILTIN_PREFIXED ("csinl")
+                 else if BUILTIN_PREFIXED ("csqrt")
+                 else if BUILTIN_PREFIXED ("csqrtf")
+                 else if BUILTIN_PREFIXED ("csqrtl")
+                 else if BUILTIN_PREFIXED ("ctan")
+                 else if BUILTIN_PREFIXED ("ctanf")
+                 else if BUILTIN_PREFIXED ("ctanh")
+                 else if BUILTIN_PREFIXED ("ctanhf")
+                 else if BUILTIN_PREFIXED ("ctanhl")
+                 else if BUILTIN_PREFIXED ("ctanl")
+                 else if BUILTIN_PREFIXED ("bcmp")
+                 else if BUILTIN_PREFIXED ("bcopy")
+                 else if BUILTIN_PREFIXED ("bzero")
+                 else if BUILTIN_PREFIXED ("index")
+                 else if BUILTIN_PREFIXED ("memcmp")
+                 else if BUILTIN_PREFIXED ("memcpy")
+                 else if BUILTIN_PREFIXED ("memmove")
+                 else if BUILTIN_PREFIXED ("mempcpy")
+                 else if BUILTIN_PREFIXED ("memset")
+                 else if BUILTIN_PREFIXED ("rindex")
+                 else if BUILTIN_PREFIXED ("stpcpy")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("stpncpy")
+                 else if BUILTIN_PREFIXED ("strcasecmp")
+#endif
+                 else if BUILTIN_PREFIXED ("strcat")
+                 else if BUILTIN_PREFIXED ("strchr")
+                 else if BUILTIN_PREFIXED ("strcmp")
+                 else if BUILTIN_PREFIXED ("strcpy")
+                 else if BUILTIN_PREFIXED ("strcspn")
+                 else if BUILTIN_PREFIXED ("strdup")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("strndup")
+#endif
+                 else if BUILTIN_PREFIXED ("strlen")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("strncasecmp")
+#endif
+                 else if BUILTIN_PREFIXED ("strncat")
+                 else if BUILTIN_PREFIXED ("strncmp")
+                 else if BUILTIN_PREFIXED ("strncpy")
+                 else if BUILTIN_PREFIXED ("strpbrk")
+                 else if BUILTIN_PREFIXED ("strrchr")
+                 else if BUILTIN_PREFIXED ("strspn")
+                 else if BUILTIN_PREFIXED ("strstr")
+                 else if BUILTIN_PREFIXED ("fprintf")
+                 else if BUILTIN_PREFIXED ("fprintf_unlocked")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("putc")
+                 else if BUILTIN_PREFIXED ("putc_unlocked")
+#endif
+                 else if BUILTIN_PREFIXED ("fputc")
+                 else if BUILTIN_PREFIXED ("fputc_unlocked")
+                 else if BUILTIN_PREFIXED ("fputs")
+                 else if BUILTIN_PREFIXED ("fputs_unlocked")
+                 else if BUILTIN_PREFIXED ("fscanf")
+                 else if BUILTIN_PREFIXED ("fwrite")
+                 else if BUILTIN_PREFIXED ("fwrite_unlocked")
+                 else if BUILTIN_PREFIXED ("printf")
+                 else if BUILTIN_PREFIXED ("printf_unlocked")
+                 else if BUILTIN_PREFIXED ("putchar")
+                 else if BUILTIN_PREFIXED ("putchar_unlocked")
+                 else if BUILTIN_PREFIXED ("puts")
+                 else if BUILTIN_PREFIXED ("puts_unlocked")
+                 else if BUILTIN_PREFIXED ("scanf")
+                 else if BUILTIN_PREFIXED ("snprintf")
+                 else if BUILTIN_PREFIXED ("sprintf")
+                 else if BUILTIN_PREFIXED ("sscanf")
+                 else if BUILTIN_PREFIXED ("vfprintf")
+                 else if BUILTIN_PREFIXED ("vfscanf")
+                 else if BUILTIN_PREFIXED ("vprintf")
+                 else if BUILTIN_PREFIXED ("vscanf")
+                 else if BUILTIN_PREFIXED ("vsnprintf")
+                 else if BUILTIN_PREFIXED ("vsprintf")
+                 else if BUILTIN_PREFIXED ("vsscanf")
+                 else if BUILTIN_PREFIXED ("isalnum")
+                 else if BUILTIN_PREFIXED ("isalpha")
+                 else if BUILTIN_PREFIXED ("isascii")
+                 else if BUILTIN_PREFIXED ("isblank")
+                 else if BUILTIN_PREFIXED ("iscntrl")
+                 else if BUILTIN_PREFIXED ("isdigit")
+                 else if BUILTIN_PREFIXED ("isgraph")
+                 else if BUILTIN_PREFIXED ("islower")
+                 else if BUILTIN_PREFIXED ("isprint")
+                 else if BUILTIN_PREFIXED ("ispunct")
+                 else if BUILTIN_PREFIXED ("isspace")
+                 else if BUILTIN_PREFIXED ("isupper")
+                 else if BUILTIN_PREFIXED ("isxdigit")
+                 else if BUILTIN_PREFIXED ("toascii")
+                 else if BUILTIN_PREFIXED ("tolower")
+                 else if BUILTIN_PREFIXED ("toupper")
+                 else if BUILTIN_PREFIXED ("iswalnum")
+                 else if BUILTIN_PREFIXED ("iswalpha")
+                 else if BUILTIN_PREFIXED ("iswblank")
+                 else if BUILTIN_PREFIXED ("iswcntrl")
+                 else if BUILTIN_PREFIXED ("iswdigit")
+                 else if BUILTIN_PREFIXED ("iswgraph")
+                 else if BUILTIN_PREFIXED ("iswlower")
+                 else if BUILTIN_PREFIXED ("iswprint")
+                 else if BUILTIN_PREFIXED ("iswpunct")
+                 else if BUILTIN_PREFIXED ("iswspace")
+                 else if BUILTIN_PREFIXED ("iswupper")
+                 else if BUILTIN_PREFIXED ("iswxdigit")
+                 else if BUILTIN_PREFIXED ("towlower")
+                 else if BUILTIN_PREFIXED ("towupper")
+                 else if BUILTIN_PREFIXED ("abort")
+                 else if BUILTIN_PREFIXED ("abs")
+                 else if BUILTIN_PREFIXED ("aggregate_incoming_address")
+                 else if BUILTIN_PREFIXED ("alloca")
+                 else if BUILTIN_PREFIXED ("apply")
+                 else if BUILTIN_PREFIXED ("apply_args")
+                 else if BUILTIN_PREFIXED ("args_info")
+                 else if BUILTIN_PREFIXED ("calloc")
+                 else if BUILTIN_PREFIXED ("classify_type")
+                 else if BUILTIN_PREFIXED ("clz")
+                 else if BUILTIN_PREFIXED ("clzimax")
+                 else if BUILTIN_PREFIXED ("clzl")
+                 else if BUILTIN_PREFIXED ("clzll")
+                 else if BUILTIN_PREFIXED ("constant_p")
+                 else if BUILTIN_PREFIXED ("ctz")
+                 else if BUILTIN_PREFIXED ("ctzimax")
+                 else if BUILTIN_PREFIXED ("ctzl")
+                 else if BUILTIN_PREFIXED ("ctzll")
+                 else if BUILTIN_PREFIXED ("dcgettext")
+                 else if BUILTIN_PREFIXED ("dgettext")
+                 else if BUILTIN_PREFIXED ("dwarf_cfa")
+                 else if BUILTIN_PREFIXED ("dwarf_sp_column")
+                 else if BUILTIN_PREFIXED ("eh_return")
+                 else if BUILTIN_PREFIXED ("eh_return_data_regno")
+                 else if BUILTIN_PREFIXED ("execl")
+                 else if BUILTIN_PREFIXED ("execlp")
+                 else if BUILTIN_PREFIXED ("execle")
+                 else if BUILTIN_PREFIXED ("execv")
+                 else if BUILTIN_PREFIXED ("execvp")
+                 else if BUILTIN_PREFIXED ("execve")
+                 else if BUILTIN_PREFIXED ("exit")
+                 else if BUILTIN_PREFIXED ("expect")
+                 else if BUILTIN_PREFIXED ("extend_pointer")
+                 else if BUILTIN_PREFIXED ("extract_return_addr")
+                 else if BUILTIN_PREFIXED ("ffs")
+                 else if BUILTIN_PREFIXED ("ffsimax")
+                 else if BUILTIN_PREFIXED ("ffsl")
+                 else if BUILTIN_PREFIXED ("ffsll")
+                 else if BUILTIN_PREFIXED ("fork")
+                 else if BUILTIN_PREFIXED ("frame_address")
+                 else if BUILTIN_PREFIXED ("frob_return_addr")
+                 else if BUILTIN_PREFIXED ("gettext")
+                 else if BUILTIN_PREFIXED ("imaxabs")
+                 else if BUILTIN_PREFIXED ("init_dwarf_reg_size_table")
+                 else if BUILTIN_PREFIXED ("finite")
+                 else if BUILTIN_PREFIXED ("finitef")
+                 else if BUILTIN_PREFIXED ("finitel")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("finited32")
+                 else if BUILTIN_PREFIXED ("finited64")
+                 else if BUILTIN_PREFIXED ("finited128")
+#endif
+                 else if BUILTIN_PREFIXED ("isinf")
+                 else if BUILTIN_PREFIXED ("isinff")
+                 else if BUILTIN_PREFIXED ("isinfl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("isinfd32")
+                 else if BUILTIN_PREFIXED ("isinfd64")
+                 else if BUILTIN_PREFIXED ("isinfd128")
+#endif
+                 else if BUILTIN_PREFIXED ("isnan")
+                 else if BUILTIN_PREFIXED ("isnanf")
+                 else if BUILTIN_PREFIXED ("isnanl")
+#ifdef FE_GNU_4_2_0
+                 else if BUILTIN_PREFIXED ("isnand32")
+                 else if BUILTIN_PREFIXED ("isnand64")
+                 else if BUILTIN_PREFIXED ("isnand128")
+#endif
+                 else if BUILTIN_PREFIXED ("isgreater")
+                 else if BUILTIN_PREFIXED ("isgreaterequal")
+                 else if BUILTIN_PREFIXED ("isless")
+                 else if BUILTIN_PREFIXED ("islessequal")
+                 else if BUILTIN_PREFIXED ("islessgreater")
+                 else if BUILTIN_PREFIXED ("isunordered")
+                 else if BUILTIN_PREFIXED ("labs")
+                 else if BUILTIN_PREFIXED ("llabs")
+                 else if BUILTIN_PREFIXED ("longjmp")
+                 else if BUILTIN_PREFIXED ("malloc")
+                 else if BUILTIN_PREFIXED ("next_arg")
+                 else if BUILTIN_PREFIXED ("parity")
+                 else if BUILTIN_PREFIXED ("parityimax")
+                 else if BUILTIN_PREFIXED ("parityl")
+                 else if BUILTIN_PREFIXED ("parityll")
+                 else if BUILTIN_PREFIXED ("popcount")
+                 else if BUILTIN_PREFIXED ("popcountimax")
+                 else if BUILTIN_PREFIXED ("popcountl")
+                 else if BUILTIN_PREFIXED ("popcountll")
+                 else if BUILTIN_PREFIXED ("prefetch")
+                 else if BUILTIN_PREFIXED ("return")
+                 else if BUILTIN_PREFIXED ("return_address")
+                 else if BUILTIN_PREFIXED ("saveregs")
+                 else if BUILTIN_PREFIXED ("setjmp")
+                 else if BUILTIN_PREFIXED ("stdarg_start")
+                 else if BUILTIN_PREFIXED ("strfmon")
+                 else if BUILTIN_PREFIXED ("strftime")
+                 else if BUILTIN_PREFIXED ("trap")
+                 else if BUILTIN_PREFIXED ("unwind_init")
+                 else if BUILTIN_PREFIXED ("update_setjmp_buf")
+                 else if BUILTIN_PREFIXED ("va_copy")
+                 else if BUILTIN_PREFIXED ("va_end")
+                 else if BUILTIN_PREFIXED ("va_start")
+                 else if BUILTIN_PREFIXED ("_exit")
+                 else if BUILTIN_PREFIXED ("_Exit")
+
+                 /* Else, it's a builtin-type or something that we do not care converting
+                  * like the other builtin's. */
+
+                 else goto SET_ID_PTR;
+
+               }
+               else {
+                 SET_ID_PTR:
+                 _gs_s (name, (gs_string_t) IDENTIFIER_POINTER (t),
+			1 + strlen (IDENTIFIER_POINTER (t)));
+               }
+               ATTACH_ID_PTR:
+	       gs_set_operand ((gs_t) GS_NODE (t), GS_IDENTIFIER_POINTER, name);
+            }
+	    break;
+
+	  case TREE_LIST:
+            /* TREE_PURPOSE */
+            /* TREE_VALUE */
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TREE_PURPOSE,
+		       gs_x_1(TREE_PURPOSE(t), seq_num));
+	    /* bug 8346 */
+	    if (TREE_VALUE(t))
+	      STRIP_USELESS_TYPE_CONVERSION(TREE_VALUE(t));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_TREE_VALUE,
+		       gs_x_1(TREE_VALUE(t), seq_num));
+	    break;
+
+	  case TREE_VEC:
+            {
+              /* TREE_VEC_LENGTH */
+              /* TREE_VEC_ELT */
+              int i, len;
+              gs_t tree_vec_elt_list;
+              {
+                gs_t length;
+                length = __gs (IB_INT);
+                _gs_n (length, TREE_VEC_LENGTH (t));
+                gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_VEC_LENGTH, length);
+              }
+              len = TREE_VEC_LENGTH (t);
+              tree_vec_elt_list = __gs (EMPTY);
+              for (i = 0; i < len; i++)
+                tree_vec_elt_list = gs_cons(gs_x_1(TREE_VEC_ELT(t, i), seq_num),
+					    tree_vec_elt_list);
+              gs_set_operand ((gs_t) GS_NODE (t), GS_TREE_VEC_ELT, tree_vec_elt_list);
+            }
+	    break;
+
+	  case BLOCK:
+            /* BLOCK_VARS */
+            /* BLOCK_SUPERCONTEXT */
+            /* BLOCK_SUBBLOCKS */
+            /* BLOCK_CHAIN */
+            /* BLOCK_ABSTRACT_ORIGIN */
+	    gs_set_operand((gs_t) GS_NODE(t), GS_BLOCK_VARS,
+		       gs_x_1(BLOCK_VARS(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_BLOCK_SUPERCONTEXT,
+		       gs_x_1(BLOCK_SUPERCONTEXT(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_BLOCK_SUBBLOCKS,
+		       gs_x_1(BLOCK_SUBBLOCKS(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_BLOCK_CHAIN,
+		       gs_x_1(BLOCK_CHAIN(t), seq_num));
+	    gs_set_operand((gs_t) GS_NODE(t), GS_BLOCK_ABSTRACT_ORIGIN,
+		       gs_x_1(BLOCK_ABSTRACT_ORIGIN(t), seq_num));
+	    break;
+
+	  case SSA_NAME:
+	    break;
+
+          case STATEMENT_LIST:
+            {
+              tree_stmt_iterator i;
+              gs_t stmt_list = __gs (EMPTY);
+              for (i = tsi_last (t); (i.ptr) != NULL; tsi_prev (&i)) {
+                stmt_list = gs_cons(gs_x_1(tsi_stmt(i), seq_num), stmt_list);
+              }
+              gs_set_operand ((gs_t) GS_NODE (t), GS_STATEMENT_LIST_ELTS, stmt_list);
+            }
+	    break;
+
+          case TREE_BINFO:
+            gs_set_operand((gs_t) GS_NODE(t), GS_BINFO_TYPE,
+		       gs_x_1(BINFO_TYPE(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_BINFO_VPTR_FIELD,
+		       gs_x_1(BINFO_VPTR_FIELD(t), seq_num));
+            _gs_bv(flags, GS_BINFO_VIRTUAL_P, BINFO_VIRTUAL_P(t));
+
+	    /* Traverse the vector of base infos.  Put the base infos on a
+	     * gspin list. */
+	    {
+	      gs_t list = __gs(EMPTY);
+	      unsigned int i;
+	      for (i = 0; i < BINFO_N_BASE_BINFOS(t); i++) {
+		tree base_binfo = BINFO_BASE_BINFO(t, i);
+		list = gs_cons(gs_x_1(base_binfo, seq_num), list);
+	      }
+	      gs_set_operand((gs_t) GS_NODE(t), GS_BINFO_BASE_BINFOS, list);
+	    }
+	    break;
+
+          case TEMPLATE_PARM_INDEX:
+            {
+              gs_t tpi_idx, tpi_level, tpi_orig_level;
+
+              tpi_idx = __gs (IB_INT);
+              _gs_n (tpi_idx, TEMPLATE_PARM_IDX (t));
+
+              tpi_level = __gs (IB_INT);
+              _gs_n (tpi_level, TEMPLATE_PARM_LEVEL (t));
+
+              tpi_orig_level = __gs (IB_INT);
+              _gs_n (tpi_orig_level, TEMPLATE_PARM_ORIG_LEVEL (t));
+
+              gs_set_operand((gs_t) GS_NODE(t), GS_TEMPLATE_PARM_IDX, tpi_idx);
+              gs_set_operand((gs_t) GS_NODE(t), GS_TEMPLATE_PARM_LEVEL, tpi_level);
+              gs_set_operand((gs_t) GS_NODE(t), GS_TEMPLATE_PARM_DESCENDANTS,
+			 gs_x_1(TEMPLATE_PARM_DESCENDANTS(t), seq_num));
+              gs_set_operand((gs_t) GS_NODE(t), GS_TEMPLATE_PARM_ORIG_LEVEL,
+			 tpi_orig_level);
+              gs_set_operand((gs_t) GS_NODE(t), GS_TEMPLATE_PARM_DECL,
+			 gs_x_1(TEMPLATE_PARM_DECL(t), seq_num));
+            }
+	    break;
+
+          case BASELINK:
+            gs_set_operand((gs_t) GS_NODE(t), GS_BASELINK_BINFO,
+		       gs_x_1(BASELINK_BINFO(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_BASELINK_FUNCTIONS,
+		       gs_x_1(BASELINK_FUNCTIONS(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_BASELINK_ACCESS_BINFO,
+		       gs_x_1(BASELINK_ACCESS_BINFO(t), seq_num));
+            gs_set_operand((gs_t) GS_NODE(t), GS_BASELINK_OPTYPE,
+		       gs_x_1(BASELINK_OPTYPE(t), seq_num));
+	    break;
+
+          case OVERLOAD:
+	  /* OVERLOAD not yet used by wgen. OVL_FUNCTION and OVL_CURRENT
+	   * returns tree_overload*, so we should check if the following
+	   * disabled code are correct. */
+#if 0
+            gs_set_operand((gs_t) GS_NODE(t), GS_OVL_FUNCTION,
+		       gs_x_1(OVL_FUNCTION(t), seq_num));
+#endif
+            gs_set_operand((gs_t) GS_NODE(t), GS_OVL_CHAIN,
+		       gs_x_1(OVL_CHAIN(t), seq_num));
+#if 0
+            gs_set_operand((gs_t) GS_NODE(t), GS_OVL_CURRENT,
+		       gs_x_1(OVL_CURRENT(t), seq_num));
+#endif
+            gs_set_operand((gs_t) GS_NODE(t), GS_OVL_NEXT,
+		       gs_x_1(OVL_NEXT(t), seq_num));
+	    break;
+
+          case CONSTRUCTOR:
+            {
+              gs_t constructor_elts_index, constructor_elts_value;
+              tree field, value;
+              signed HOST_WIDE_INT idx;
+              {
+                gs_t length = __gs (IB_INT);
+                _gs_n (length,
+                       VEC_length (constructor_elt, CONSTRUCTOR_ELTS(t)));
+                gs_set_operand ((gs_t) GS_NODE (t),
+                                 GS_CONSTRUCTOR_LENGTH, length);
+              }
+              constructor_elts_index = __gs (EMPTY);
+              constructor_elts_value = __gs (EMPTY);
+              /* Traverse in reverse order to preserve the order of
+               * initializations, because gs_cons reverses it again. */
+              FOR_EACH_CONSTRUCTOR_ELT_R (CONSTRUCTOR_ELTS(t), idx, field, value)
+              {
+                constructor_elts_index = gs_cons(gs_x_1(field, seq_num),
+                                                constructor_elts_index);
+                constructor_elts_value = gs_cons(gs_x_1(value, seq_num),
+                                                constructor_elts_value);
+              }
+              gs_set_operand ((gs_t) GS_NODE (t), GS_CONSTRUCTOR_ELTS_INDEX,
+                              constructor_elts_index);
+              gs_set_operand ((gs_t) GS_NODE (t), GS_CONSTRUCTOR_ELTS_VALUE,
+                              constructor_elts_value);
+            }
+            break;
+
+          case OMP_CLAUSE:
+            {
+              gs_t clause_code = __gs (IB_INT);
+              _gs_n (clause_code,
+                     gcc_omp_clause_code2gs_occ(OMP_CLAUSE_CODE(t)));
+              gs_set_operand((gs_t) GS_NODE(t), GS_OMP_CLAUSE_CODE,
+                             clause_code);
+              /* OMP_CLAUSE_DECL, OMP_CLAUSE_NUM_THREADS_EXPR, OMP_CLAUSE_IF_EXPR */
+
+              switch (OMP_CLAUSE_CODE(t))
+              {
+                case OMP_CLAUSE_REDUCTION:
+                {
+                  gs_t reduction_code = __gs (IB_INT);
+                  _gs_n (reduction_code, gcc2gs(OMP_CLAUSE_REDUCTION_CODE(t)));
+                  gs_set_operand((gs_t) GS_NODE(t),
+                                 GS_OMP_CLAUSE_REDUCTION_CODE,
+                                 reduction_code);
+                  /* fall through */
+                }
+                case OMP_CLAUSE_COPYIN:
+                case OMP_CLAUSE_PRIVATE:
+                case OMP_CLAUSE_FIRSTPRIVATE:
+                case OMP_CLAUSE_LASTPRIVATE:
+                case OMP_CLAUSE_SHARED:
+                case OMP_CLAUSE_COPYPRIVATE:
+                  gs_set_operand((gs_t) GS_NODE(t), GS_OMP_CLAUSE_DECL,
+                                 gs_x_1(OMP_CLAUSE_DECL(t), seq_num));
+                  break;
+                case OMP_CLAUSE_NUM_THREADS:
+                  gs_set_operand((gs_t) GS_NODE(t),
+                            GS_OMP_CLAUSE_NUM_THREADS_EXPR,
+                            gs_x_1(OMP_CLAUSE_NUM_THREADS_EXPR(t), seq_num));
+                  break;
+                case OMP_CLAUSE_IF:
+                  gs_set_operand((gs_t) GS_NODE(t), GS_OMP_CLAUSE_IF_EXPR,
+                                 gs_x_1(OMP_CLAUSE_IF_EXPR(t), seq_num));
+                  break;
+                case OMP_CLAUSE_DEFAULT:
+                {
+                  gs_t default_kind = __gs (IB_INT);
+                  _gs_n (default_kind,
+                         gcc_omp_clause_default_kind2gs_ocdk(OMP_CLAUSE_DEFAULT_KIND(t)));
+                  gs_set_operand((gs_t) GS_NODE(t), GS_OMP_CLAUSE_DEFAULT_KIND,
+                                 default_kind);
+                }
+                break;
+
+                case OMP_CLAUSE_NOWAIT:
+                case OMP_CLAUSE_ORDERED:
+                  /* Do nothing. */
+                  break;
+
+                case OMP_CLAUSE_SCHEDULE:
+                {
+                  gs_t schedule_kind = __gs (IB_INT);
+                  _gs_n (schedule_kind,
+          gcc_omp_clause_schedule_kind2gs_ocsk(OMP_CLAUSE_SCHEDULE_KIND(t)));
+                  gs_set_operand((gs_t) GS_NODE(t), GS_OMP_CLAUSE_SCHEDULE_KIND,
+                                 schedule_kind);
+
+                  gs_set_operand((gs_t) GS_NODE(t),
+                                 GS_OMP_CLAUSE_SCHEDULE_CHUNK_EXPR,
+                           gs_x_1(OMP_CLAUSE_SCHEDULE_CHUNK_EXPR(t), seq_num));
+                }
+                break;
+
+                default:
+                  fprintf (stdout, "Unhandled OpenMP clause code\n");
+                  gcc_assert (0);
+              }
+            }
+            break;
+
+	  default:
+            fprintf (stdout,
+	      "Unhandled case %s in gs_x_1. (tcc_constant/tcc_exceptional)\n",
+	      tree_code_name[(int) TREE_CODE ((t))]);
+            gcc_assert (0);
+	    break;
+      }
+      break;
+    }
+
+  return (gs_t) GS_NODE (t);
+}
+
+gs_t
+gs_x_func_decl (tree t)
+{
+  translate_func_decl = 1;	/* Translate FUNCTION_DECLs. */
+  sequence_num++;
+  return gs_x_1(t, sequence_num);
+}
+
+gs_t
+gs_x (tree t)
+{
+  translate_func_decl = 0;	/* Don't translate FUNCTION_DECLs. */
+  sequence_num++;
+  return gs_x_1(t, sequence_num);
+}
+
+/* Like translate_func_decl, except for C++ thunk functions. Thunk
+ * functions are fully translated only when this variable is set. */
+static bool translate_thunk_decl = false;
+
+/* Add T to list of decls emitted by g++. */
+void
+gspin_gxx_emits_decl (tree t)
+{
+  gs_t decl, decl_list;
+
+  if (translate_thunk_decl) {
+    /* Fully translate this thunk function. This is the only place other
+     * than tree_rest_of_compilation() where we fully process a function
+     * in C++. */
+    translate_thunk_decl = false;
+    decl = gs_x_func_decl(t);
+  }
+  else
+    decl = gs_x(t);
+
+  if (gs_code(gxx_emitted_decls_dot) == EMPTY) {
+    _gs_code(gxx_emitted_decls_dot, CONS);
+    gs_set_operand(gxx_emitted_decls_dot, 0, decl);
+    gs_set_operand(gxx_emitted_decls_dot, 1, __gs(EMPTY));
+    return;
+  }
+  decl_list = gs_cons(decl, gs_operand(gxx_emitted_decls_dot, 1));
+  gs_set_operand(gxx_emitted_decls_dot, 1, decl_list);
+  gxx_emitted_decls_dot = decl_list;
+}
+
+/* Called only from use_thunk() for C++. */
+void
+gspin_gxx_emits_thunk_decl (tree t)
+{
+  translate_thunk_decl = true;
+  gspin_gxx_emits_decl(t);
+}
+
+/* Add T to list of asms emitted by g++. */
+void
+gspin_gxx_emits_asm (tree t)
+{
+  gs_t decl, decl_list;
+  decl = gs_x(t);
+
+  if (gs_code(program_decls_dot) == EMPTY) {
+    _gs_code(program_decls_dot, CONS);
+    gs_set_operand(program_decls_dot, 0, decl);
+    gs_set_operand(program_decls_dot, 1, __gs(EMPTY));
+    return;
+  }
+  decl_list = gs_cons(decl, gs_operand(program_decls_dot, 1));
+  gs_set_operand(program_decls_dot, 1, decl_list);
+  program_decls_dot = decl_list;
+}
+
+void
+gspin_add_weak (tree decl, gs_t decl_node)
+{
+  gs_t list;
+
+  GS_ASSERT(decl != NULL &&
+	    (TREE_CODE(decl) == VAR_DECL || TREE_CODE(decl) == FUNCTION_DECL),
+	    ("gspin_add_weak: bad decl"));
+
+  if (DECL_ADDED_TO_WEAK_DECLS(decl))
+    return;
+
+  DECL_ADDED_TO_WEAK_DECLS(decl) = 1;
+
+  if (gs_code(weak_decls_dot) == EMPTY) {
+    _gs_code(weak_decls_dot, CONS);
+    gs_set_operand(weak_decls_dot, 0, decl_node);
+    gs_set_operand(weak_decls_dot, 1, __gs(EMPTY));
+    return;
+  }
+  list = gs_cons(decl_node, gs_operand(weak_decls_dot, 1));
+  gs_set_operand(weak_decls_dot, 1, list);
+  weak_decls_dot = list;
+}
+
+/* Dump a STATEMENT_LIST for debugging. */
+void
+dump_statement_list (tree t)
+{
+  tree_stmt_iterator i;
+
+  if (t &&
+      TREE_CODE(t) == STATEMENT_LIST) {
+    for (i = tsi_start(t); (i.ptr) != NULL; tsi_next(&i)) {
+      tree item = tsi_stmt(i);
+      if (item) {
+	debug_tree(item);
+      }
+    }
+  }
+}
+
+bool
+lang_cplus (void)
+{
+  return CPR();
+}
+#endif

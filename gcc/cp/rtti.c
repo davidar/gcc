@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* RunTime Type Identification
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
    2005, 2006
@@ -332,6 +336,10 @@ tinfo_name (tree type)
   return name_string;
 }
 
+#ifdef KEY
+tree (*p_get_tinfo_decl) (tree) = get_tinfo_decl;
+#endif
+
 /* Return a VAR_DECL for the internal ABI defined type_info object for
    TYPE. You must arrange that the decl is mark_used, if actually use
    it --- decls in vtables are only used if the vtable is output.  */
@@ -377,6 +385,10 @@ get_tinfo_decl (tree type)
       TREE_TYPE (name) = type;
       DECL_TINFO_P (d) = 1;
       DECL_ARTIFICIAL (d) = 1;
+#ifdef KEY /* g++ does not actually ignore it (note push operation below),
+              so we cannot either */
+      if (!flag_spin_file)
+#endif
       DECL_IGNORED_P (d) = 1;
       TREE_READONLY (d) = 1;
       TREE_STATIC (d) = 1;
@@ -819,6 +831,9 @@ tinfo_base_init (tinfo_s *ti, tree target)
     name_decl = build_lang_decl (VAR_DECL, name_name, name_type);
     SET_DECL_ASSEMBLER_NAME (name_decl, name_name);
     DECL_ARTIFICIAL (name_decl) = 1;
+#ifdef KEY /* g++ actually does not ignore it, so we cannot either */
+    if (!flag_spin_file)
+#endif
     DECL_IGNORED_P (name_decl) = 1;
     TREE_READONLY (name_decl) = 1;
     TREE_STATIC (name_decl) = 1;
@@ -1476,7 +1491,13 @@ emit_tinfo_decl (tree decl)
     }
 
   import_export_decl (decl);
+#ifdef KEY
+  if (DECL_NOT_REALLY_EXTERN (decl) &&
+      (( flag_spin_file && decl_maybe_needed_p (decl)) ||
+       (!flag_spin_file && decl_needed_p (decl))))
+#else
   if (DECL_NOT_REALLY_EXTERN (decl) && decl_needed_p (decl))
+#endif
     {
       tree init;
 
@@ -1485,6 +1506,19 @@ emit_tinfo_decl (tree decl)
       DECL_INITIAL (decl) = init;
       mark_used (decl);
       finish_decl (decl, init, NULL_TREE);
+#ifdef KEY
+      if (flag_spin_file) {
+        if (gspin_invoked(decl))
+          gs_x(decl);
+
+        if (TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (decl)))
+          TREE_NOT_EMITTED_BY_GXX (decl) = 0;
+        else
+          /* at this point it seems g++ is not emitting this symbol, we will
+           * decide */
+          TREE_NOT_EMITTED_BY_GXX (decl) = 1;
+      }
+#endif
       return true;
     }
   else

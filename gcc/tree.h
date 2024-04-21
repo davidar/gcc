@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2009 Advanced Micro Devices, Inc.  All Rights Reserved.
+ */
+
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Front-end tree definitions for GNU compiler.
    Copyright (C) 1989, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
    2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -381,6 +388,23 @@ struct tree_common GTY(())
   unsigned lang_flag_5 : 1;
   unsigned lang_flag_6 : 1;
   unsigned visited : 1;
+
+  unsigned int emitted : 1;                     /* KEY */
+  unsigned int not_emitted_by_gxx : 1;          /* KEY */
+    /* emit_target_expr_cleanup is used only by TARGET_EXPR, but there is no
+       unused bit field in "struct tree_exp".  Put the bit here for
+       convenience. */
+  unsigned int emit_target_expr_cleanup : 1;    /* KEY */
+    /* dwarf_access: holds enum dwarf_access_attribute */
+  unsigned int dwarf_access : 2;                /* KEY */
+    /* indicate if the tree node is fully or partially translated to spin */
+  unsigned int fully_translated_to_gs : 1;      /* KEY */
+    /* indicate if the node has been fully translated as an extern inline
+       definition. */
+  unsigned int translated_as_inline : 1;	/* KEY */
+
+  unsigned long translated_gs_node;             /* KEY */
+  HOST_WIDE_INT gs_sequence_num;                /* KEY */
 };
 
 /* The following table lists the uses of each of the above flags and
@@ -1383,6 +1407,20 @@ struct tree_vec GTY(())
 	       true); \
        (IX)++)
 
+#ifdef KEY
+/* Reverse of FOR_EACH_CONSTRUCTOR_ELT. Signedness of VEC_length
+   necessitates the following early check. IX must be a scratch variable
+   of signed integer type. */
+#define FOR_EACH_CONSTRUCTOR_ELT_R(V, IX, INDEX, VAL) \
+  if (!VEC_empty (constructor_elt, V)) \
+    for (IX = VEC_length (constructor_elt, V) - 1; (IX < 0) \
+               ? false \
+               : ((VAL = VEC_index (constructor_elt, V, IX)->value), \
+                  (INDEX = VEC_index (constructor_elt, V, IX)->index), \
+               true); \
+       (IX)--)
+#endif
+
 /* Append a new constructor element to V, with the specified INDEX and VAL.  */
 #define CONSTRUCTOR_APPEND_ELT(V, INDEX, VALUE) \
   do { \
@@ -2032,6 +2070,20 @@ struct tree_block GTY(())
    0 by copy_node and make_node.  */
 #define TREE_VISITED(NODE) ((NODE)->common.visited)
 
+#ifdef KEY
+#define TREE_EMITTED(NODE) ((NODE)->common.emitted)
+#define TREE_NOT_EMITTED_BY_GXX(NODE) ((NODE)->common.not_emitted_by_gxx)
+#define GS_NODE(NODE) ((gs_void_t *)TREE_TO_TRANSLATED_GS(NODE))
+#define TREE_TO_TRANSLATED_GS(NODE) ((NODE)->common.translated_gs_node)
+#define DWARF_ACCESS(NODE) ((NODE)->common.dwarf_access)
+
+/* Inside a TARGET_EXPR, keep track if GNU is emitting the cleanup */
+#define EMIT_TARGET_EXPR_CLEANUP(NODE) ((NODE)->common.emit_target_expr_cleanup)
+#define FULLY_TRANSLATED_TO_GS(NODE) ((NODE)->common.fully_translated_to_gs)
+#define TRANSLATED_TO_GS_AS_INLINE(NODE) ((NODE)->common.translated_as_inline)
+#define GS_SEQUENCE_NUM(NODE) ((NODE)->common.gs_sequence_num)
+#endif
+
 /* If set in an ARRAY_TYPE, indicates a string type (for languages
    that distinguish string from array of char).
    If set in a INTEGER_TYPE, indicates a character type.  */
@@ -2529,6 +2581,16 @@ struct tree_struct_field_tag GTY(())
 #define DECL_CALL_CLOBBERED(DECL) \
   DECL_COMMON_CHECK (DECL)->decl_common.call_clobbered_flag
 
+#ifdef KEY
+#define DECL_EMITTED_BY_GXX(DECL) \
+  DECL_COMMON_CHECK (DECL)->decl_common.decl_emitted_by_gxx
+#define DECL_ADDED_TO_WEAK_DECLS(DECL) \
+  DECL_COMMON_CHECK (DECL)->decl_common.added_to_weak_decls
+
+#define DECL_ASMREG(NODE) (DECL_COMMON_CHECK (NODE)->decl_common.asmreg)
+#endif
+
+
 struct tree_decl_common GTY(())
 {
   struct tree_decl_minimal common;
@@ -2570,6 +2632,8 @@ struct tree_decl_common GTY(())
      parm decl. */
   unsigned gimple_reg_flag : 1;
   unsigned call_clobbered_flag : 1;
+  unsigned decl_emitted_by_gxx : 1;     /* KEY */
+  unsigned added_to_weak_decls : 1;     /* KEY */
 
   union tree_decl_u1 {
     /* In a FUNCTION_DECL for which DECL_BUILT_IN holds, this is
@@ -2594,6 +2658,8 @@ struct tree_decl_common GTY(())
   HOST_WIDE_INT pointer_alias_set;
   /* Points to a structure whose details depend on the language in use.  */
   struct lang_decl *lang_specific;
+
+  int asmreg;   /* KEY: asm register number */
 };
 
 extern tree decl_value_expr_lookup (tree);
@@ -4635,5 +4701,24 @@ extern unsigned HOST_WIDE_INT compute_builtin_object_size (tree, int);
 
 /* In expr.c.  */
 extern unsigned HOST_WIDE_INT highest_pow2_factor (tree);
+
+#ifdef KEY
+/* Bug 1392 */
+#include "gspin-gcc-interface.h"
+/* gspin global variables */
+extern int flag_spin_file;
+/* gspin function declarations */
+extern void gspin (tree t);
+extern gs_t gs_x (tree node);
+extern gs_t gs_x_func_decl (tree node);
+extern void gspin_gxx_emits_decl (tree t);
+extern void gspin_gxx_emits_thunk_decl (tree t);
+extern void gspin_gxx_emits_asm (tree t);
+extern void gspin_init_global_trees_list (void);
+extern int gspin_invoked (tree t);
+extern void gs_set_flag_value (tree t, unsigned int flag, bool value);
+extern void gs_set_program_flag_value (unsigned int flag, bool value);
+extern bool lang_cplus (void);
+#endif
 
 #endif  /* GCC_TREE_H  */

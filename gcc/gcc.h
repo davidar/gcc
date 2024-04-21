@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Header file for modules that link with gcc.c
    Copyright (C) 1999, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
 
@@ -42,6 +45,7 @@ struct spec_function
 
 /* This defines which multi-letter switches take arguments.  */
 
+/* KEY */
 #define DEFAULT_WORD_SWITCH_TAKES_ARG(STR)		\
  (!strcmp (STR, "Tdata") || !strcmp (STR, "Ttext")	\
   || !strcmp (STR, "Tbss") || !strcmp (STR, "include")	\
@@ -51,7 +55,8 @@ struct spec_function
   || !strcmp (STR, "iquote") || !strcmp (STR, "isystem") \
   || !strcmp (STR, "isysroot") \
   || !strcmp (STR, "-param") || !strcmp (STR, "specs") \
-  || !strcmp (STR, "MF") || !strcmp (STR, "MT") || !strcmp (STR, "MQ"))
+  || !strcmp (STR, "MF") || !strcmp (STR, "MT") || !strcmp (STR, "MQ") \
+  || !strcmp (STR, "spinfile"))
 
 
 /* These are exported by gcc.c.  */

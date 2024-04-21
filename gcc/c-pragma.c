@@ -1,3 +1,7 @@
+/*
+ *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
+ */
+
 /* Handle #pragma, system V.4 style.  Supports #pragma weak and #pragma pack.
    Copyright (C) 1992, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
    2006 Free Software Foundation, Inc.
@@ -590,6 +594,68 @@ maybe_apply_renaming_pragma (tree decl, tree asmname)
   return 0;
 }
 
+/* #pragam {frequency_hint|mips_frequency_hint} {never|init|frequent} */
+static void
+handle_pragma_freq_hint (cpp_reader *dummy ATTRIBUTE_UNUSED)
+{
+  tree hint, pragma_stmt, tmp;
+  const char* hint_name;
+
+  /* it should be one of the "never" "init" and "frequent" */
+  if (pragma_lex (&hint) != CPP_NAME) 
+    GCC_BAD ("malformed #pragma frequency_hint, ignored");
+
+  if (pragma_lex (&tmp) != CPP_EOF) 
+    {
+      /* note: the trailing junk will be skipped in _cpp_handle_directive()*/
+      warning (OPT_Wpragmas, "junk at end of #pragma frequency_hint");
+    }
+
+  hint_name = IDENTIFIER_POINTER(hint);
+  if (strcmp (hint_name, "never") && 
+      strcmp (hint_name, "init") && 
+      strcmp (hint_name, "frequent"))
+    {
+      GCC_BAD ("frequency hint should be one of \"never\",\"init\",\"frequent\", ignored");
+      return;
+    }
+
+  pragma_stmt = build_stmt (FREQ_HINT_STMT, 
+          build_string (strlen (hint_name) + 1, hint_name));
+  add_stmt (pragma_stmt);
+}
+
+/* #pragam no_zdl */
+static void
+handle_pragma_zdl (dummy)
+     cpp_reader *dummy ATTRIBUTE_UNUSED;
+{
+  tree hint, pragma_stmt, tmp;
+  const char* hint_name;
+  
+  /* it should be one of the "on", "off" */
+  if (pragma_lex (&hint) != CPP_NAME) 
+    GCC_BAD ("malformed #pragma zdl, ignored");
+  
+  if (pragma_lex (&tmp) != CPP_EOF) 
+    {
+      /* note: the trailing junk will be skipped in _cpp_handle_directive()*/
+      warning (OPT_Wpragmas, "junk at end of #pragma zdl");
+    }
+
+  hint_name = IDENTIFIER_POINTER(hint);
+  if (strcmp (hint_name, "on") && 
+      strcmp (hint_name, "off"))
+    {
+      GCC_BAD ("zdl should be one of \"on\",\"off\", ignored");
+      return;
+    }
+
+  pragma_stmt = build_stmt (ZDL_STMT, 
+          build_string (strlen (hint_name) + 1, hint_name));
+  add_stmt (pragma_stmt);
+}
+
 
 #ifdef HANDLE_PRAGMA_VISIBILITY
 static void handle_pragma_visibility (cpp_reader *);
@@ -688,13 +754,13 @@ handle_pragma_diagnostic(cpp_reader *ARG_UNUSED(dummy))
   enum cpp_ttype token;
   diagnostic_t kind;
   tree x;
-
+#if 0
   if (cfun)
     {
       error ("#pragma GCC diagnostic not allowed inside functions");
       return;
     }
-
+#endif
   token = pragma_lex (&x);
   if (token != CPP_NAME)
     GCC_BAD ("missing [error|warning|ignored] after %<#pragma GCC diagnostic%>");
@@ -705,6 +771,9 @@ handle_pragma_diagnostic(cpp_reader *ARG_UNUSED(dummy))
     kind = DK_WARNING;
   else if (strcmp (kind_string, "ignored") == 0)
     kind = DK_IGNORED;
+  else if (strcmp (kind_string, "push") == 0 ||
+           strcmp (kind_string, "pop") == 0)
+    return;    // ignore diagnostic push|pop
   else
     GCC_BAD ("expected [error|warning|ignored] after %<#pragma GCC diagnostic%>");
 
@@ -724,7 +793,7 @@ handle_pragma_diagnostic(cpp_reader *ARG_UNUSED(dummy))
 	    *(int *) cl_options[option_index].flag_var = 1;
 	return;
       }
-  GCC_BAD ("unknown option after %<#pragma GCC diagnostic%> kind");
+  //GCC_BAD ("unknown option after %<#pragma GCC diagnostic%> kind");
 }
 
 /* A vector of registered pragma callbacks.  */
@@ -825,6 +894,12 @@ init_pragma (void)
 #ifdef HANDLE_PRAGMA_VISIBILITY
   c_register_pragma ("GCC", "visibility", handle_pragma_visibility);
 #endif
+
+  c_register_pragma (0, "frequency_hint", handle_pragma_freq_hint);
+  
+  c_register_pragma (0, "mips_frequency_hint", handle_pragma_freq_hint);
+  
+  c_register_pragma (0, "zdl", handle_pragma_zdl);
 
   c_register_pragma ("GCC", "diagnostic", handle_pragma_diagnostic);
 

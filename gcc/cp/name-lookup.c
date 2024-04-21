@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
+
 /* Definitions for C++ name lookup routines.
    Copyright (C) 2003, 2004, 2005, 2006  Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
@@ -32,6 +36,10 @@ Boston, MA 02110-1301, USA.  */
 #include "diagnostic.h"
 #include "debug.h"
 #include "c-pragma.h"
+
+#ifdef KEY
+extern void gspin_gxx_emits_decl (tree);
+#endif
 
 /* The bindings for a particular name in a particular scope.  */
 
@@ -2860,6 +2868,12 @@ do_class_using_decl (tree scope, tree name)
 }
 
 
+
+#ifdef KEY
+/* For gs_x (): */
+tree (*p_namespace_binding) (tree, tree) = namespace_binding;
+#endif
+
 /* Return the binding value for name in scope.  */
 
 tree
@@ -3057,6 +3071,11 @@ push_namespace_with_attribs (tree name, tree attributes)
 	  DECL_NAME (d) = NULL_TREE;
 	}
       begin_scope (sk_namespace, d);
+
+#ifdef KEY
+      if (flag_spin_file)
+        gspin_gxx_emits_decl (d);
+#endif
     }
   else
     resume_scope (NAMESPACE_LEVEL (d));

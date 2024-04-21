@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Branch prediction routines for the GNU compiler.
    Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005
    Free Software Foundation, Inc.
@@ -1903,7 +1906,12 @@ choose_function_section (void)
 static bool
 gate_estimate_probability (void)
 {
+#ifdef KEY
+  /* Don't run this pass when we are translating into gspin */
+  return !flag_spin_file && flag_guess_branch_prob;
+#else
   return flag_guess_branch_prob;
+#endif
 }
 
 struct tree_opt_pass pass_profile = 

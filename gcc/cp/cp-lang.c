@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* Language-dependent hooks for C++.
    Copyright 2001, 2002, 2004 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
@@ -50,6 +53,19 @@ static void cp_init_ts (void);
 #define LANG_HOOKS_FOLD_OBJ_TYPE_REF cp_fold_obj_type_ref
 #undef LANG_HOOKS_INIT_TS
 #define LANG_HOOKS_INIT_TS cp_init_ts
+
+#ifdef KEY
+extern tree simplify_aggr_init_exprs_r (tree *, int *, void *);
+
+#undef LANG_HOOKS_CPLUS_EXPAND_CONSTANT
+#define LANG_HOOKS_CPLUS_EXPAND_CONSTANT cplus_expand_constant
+#undef LANG_HOOKS_MANGLE_DECL
+#define LANG_HOOKS_MANGLE_DECL mangle_decl
+#undef LANG_HOOKS_CP_GENERICIZE
+#define LANG_HOOKS_CP_GENERICIZE cp_genericize
+#undef LANG_HOOKS_SIMPLIFY_AGGR_INIT_EXPRS_R
+#define LANG_HOOKS_SIMPLIFY_AGGR_INIT_EXPRS_R simplify_aggr_init_exprs_r
+#endif
 
 /* Each front end provides its own lang hook initializer.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;

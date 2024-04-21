@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2007. QLogic Corporation. All Rights Reserved.
+ */
 /* The lang_hooks data structure.
    Copyright 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
 
@@ -463,6 +466,13 @@ struct lang_hooks
      *SE if in the process TREE_CONSTANT, TREE_INVARIANT or
      TREE_SIDE_EFFECTS need updating.  */
   tree (*expr_to_decl) (tree expr, bool *tc, bool *ti, bool *se);
+
+#ifdef KEY
+  tree (*cplus_expand_constant) (tree cst);
+  void (*mangle_decl) (const tree decl);
+  void (*cp_genericize) (tree fn);
+  tree (*simplify_aggr_init_exprs_r) (tree *t, int *i, void *p);
+#endif
 
   /* Whenever you add entries here, make sure you adjust langhooks-def.h
      and langhooks.c accordingly.  */
