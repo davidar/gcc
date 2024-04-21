@@ -1,4 +1,4 @@
-/* Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
+/* Copyright (C) 2007 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -24,13 +24,17 @@
    reasons why the executable file might be covered by the GNU General
    Public License.  */
 
-/* Implemented from the specification included in the AMD Programmers ManualIntel C++ Compiler
-   User Guide and Reference, version 8.0.  */
+/* Implemented from the specification included in the AMD Programmers
+   Manual Update, version 2.x */
 
 #ifndef _AMMINTRIN_H_INCLUDED
 #define _AMMINTRIN_H_INCLUDED
 
-#ifdef __SSE4A__
+#ifndef __SSE4A__
+# error "SSE4A instruction set not enabled"
+#else
+
+/* We need definitions from the SSE3, SSE2 and SSE header files*/
 #include <pmmintrin.h>
 
 static __inline void __attribute__((__always_inline__))
